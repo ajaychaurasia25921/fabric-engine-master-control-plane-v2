@@ -134,7 +134,6 @@ public class FabricAgent {
                         .call()
                         .content())
                         .subscribeOn(Schedulers.boundedElastic())
-                        .timeout(Duration.ofSeconds(8))
                         .onErrorResume(error -> {
                             log.warn("Ollama remediation plan timed out or failed for {}: {}", anomaly.nodeId(), error.getMessage());
                             return Mono.just(ruleBasedPlan(anomaly));

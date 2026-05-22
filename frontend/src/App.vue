@@ -60,14 +60,15 @@ const quantumOutput = ref('System core idle. Submit a compiled circuit mapping a
 const quantumStatus = ref('STANDBY');
 const socketOutput = ref('');
 const packetCanvasOpen = ref(false);
-const packetCanvasNodes = ref([]);
 const vdiOpen = ref(false);
+const vdiConnected = ref(false);
 const vdiOutput = ref([
   '[SYSTEM] Initiating virtual core engine lifecycle state loop over cluster link adapter...',
   '[SYSTEM] Session Authenticated. Welcome to Ubuntu Core Appliance Base (x86_64 architecture node link)',
   "Type 'help' to review simulated operating system guest terminal actions."
 ]);
 const vdiCommand = ref('');
+const vdiForm = reactive({ targetNodeId: 'vm-1', sessionMode: 'CLI' });
 const terminalConnected = ref(false);
 const terminalUser = ref('cisco_admin');
 const terminalPrompt = computed(() => (terminalForm.protocolDialectMode === 'SSH' ? 'ssh$' : 'telnet>'));
@@ -75,6 +76,7 @@ const packetHops = ref([]);
 const packetHexDump = ref('Awaiting SDN Packet Dispatch Trigger Matrix...');
 const packetByteWeight = ref('0 bytes parsed');
 const dragOver = ref(false);
+const folderUploadInput = ref(null);
 
 const serverForm = reactive({
   serverName: 'prod-zone-edge-hypervisor',
@@ -94,12 +96,16 @@ const firewallForm = reactive({ sourceCidrBlock: '10.0.0.0/8', networkDestinatio
 const packetForm = reactive({ sourcePointNode: 'Host-Alpha (VLAN 10)', destinationIpNode: '10.194.24.102', protocolDialectType: 'TCP_SYN', taggingLayerParam: 'IEEE_802_1Q_TAG_10' });
 const quantumForm = reactive({ physicalTargetQpu: 'SIMULATED_POLY_MATH_MATRIX', sequenceGateDepth: 64, processingAlgorithmClass: 'VQE_MOLECULAR_SIMULATION' });
 const socketForm = reactive({ localPort: 9000, proxyTarget: 'GRPC_PROTO' });
+const transferForm = reactive({ sourceNodeId: 'vm-1', destinationNodeId: 'vm-2' });
 
 const pageTitle = computed(() => tabCopy[activeTab.value][0]);
 const pageSubtitle = computed(() => tabCopy[activeTab.value][1]);
 const runningCount = computed(() => inventory.value.filter((item) => item.state === 'RUNNING').length);
 const firewallDropCounter = computed(() => (1842 + firewallRules.value.filter((rule) => rule.policyAction === 'DROP').length * 4).toLocaleString());
 const honeypotCount = computed(() => Math.max(3, incidents.value.length || 0));
+const transferSourceNode = computed(() => inventory.value.find((node) => node.id === transferForm.sourceNodeId) ?? inventory.value[0]);
+const transferDestinationNode = computed(() => inventory.value.find((node) => node.id === transferForm.destinationNodeId) ?? inventory.value[1] ?? inventory.value[0]);
+const selectedVdiNode = computed(() => inventory.value.find((node) => node.id === vdiForm.targetNodeId) ?? inventory.value[0]);
 
 onMounted(async () => {
   try {
@@ -207,21 +213,68 @@ async function executeTrace() {
 }
 
 async function stageFile(eventOrFile) {
-  const file = eventOrFile?.target?.files?.[0] ?? eventOrFile;
-  if (!file) return;
-  const response = await stageFileMetadata({
-    assetName: file.name,
-    assetByteSizeBytes: file.size,
-    mediaMimeType: file.type || 'application/octet-stream'
-  });
-  stagedFiles.value = [{ ...response, name: file.name, size: file.size, type: file.type || 'application/octet-stream' }, ...stagedFiles.value];
-  notify(`Resource payload '${file.name}' staged to control storage array.`);
+  const files = eventOrFile?.target?.files ? Array.from(eventOrFile.target.files) : [eventOrFile].filter(Boolean);
+  if (!files.length) return;
+  await stageTransferAssets(files);
+  if (eventOrFile?.target) eventOrFile.target.value = '';
+}
+
+async function stageTransferAssets(files) {
+  const hasFolder = files.some((file) => file.webkitRelativePath?.includes('/'));
+  const shouldCompress = hasFolder || files.length > 5;
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  const baseMetadata = {
+    sourceNode: transferSourceNode.value?.name,
+    destinationNode: transferDestinationNode.value?.name,
+    sourceIp: transferSourceNode.value?.ip,
+    destinationIp: transferDestinationNode.value?.ip
+  };
+
+  if (shouldCompress) {
+    const bundleName = hasFolder ? `folder-bundle-${Date.now()}.zip` : `multi-file-bundle-${Date.now()}.zip`;
+    const response = await stageFileMetadata({
+      assetName: bundleName,
+      assetByteSizeBytes: totalSize,
+      mediaMimeType: 'application/zip'
+    });
+    stagedFiles.value = [{
+      ...response,
+      ...baseMetadata,
+      name: bundleName,
+      size: totalSize,
+      type: 'application/zip',
+      compressed: true,
+      memberCount: files.length,
+      members: files.map((file) => file.webkitRelativePath || file.name).slice(0, 12)
+    }, ...stagedFiles.value];
+    notify(`${files.length} assets bundled as ${bundleName} for ${baseMetadata.sourceNode} -> ${baseMetadata.destinationNode}.`);
+    return;
+  }
+
+  const responses = await Promise.all(files.map(async (file) => {
+    const response = await stageFileMetadata({
+      assetName: file.name,
+      assetByteSizeBytes: file.size,
+      mediaMimeType: file.type || 'application/octet-stream'
+    });
+    return {
+      ...response,
+      ...baseMetadata,
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/octet-stream',
+      compressed: false,
+      memberCount: 1
+    };
+  }));
+  stagedFiles.value = [...responses, ...stagedFiles.value];
+  notify(`${responses.length} asset${responses.length === 1 ? '' : 's'} staged for ${baseMetadata.sourceNode} -> ${baseMetadata.destinationNode}.`);
 }
 
 async function handleDrop(event) {
   event.preventDefault();
   dragOver.value = false;
-  await stageFile(event.dataTransfer.files?.[0]);
+  await stageTransferAssets(Array.from(event.dataTransfer.files ?? []));
 }
 
 function purgeStagedFile(token) {
@@ -233,6 +286,7 @@ async function pipeFile(file) {
   const widget = {
     pipelineWidgetId: `pipe-${Date.now()}`,
     assetName: file.name,
+    route: `${file.sourceNode ?? transferSourceNode.value?.name} -> ${file.destinationNode ?? transferDestinationNode.value?.name}`,
     initialState: 'STREAMING',
     progress: 0
   };
@@ -242,11 +296,15 @@ async function pipeFile(file) {
   }, 350);
   const response = await executeFilePipeline({
     targetAssetToken: file.stagedAssetToken,
-    deploymentDestinationHost: '10.194.24.102'
+    deploymentDestinationHost: file.destinationIp ?? transferDestinationNode.value?.ip ?? '10.194.24.102'
   });
   window.clearInterval(timer);
   Object.assign(widget, response, { assetName: file.name, progress: 100, initialState: response.initialState ?? 'COMPLETED' });
   notify(`Asynchronous stream injection finalized for asset: ${file.name}.`);
+}
+
+function openFolderPicker() {
+  folderUploadInput.value?.click();
 }
 
 function launchTerminalSession() {
@@ -311,32 +369,30 @@ function triggerFakeHoneypotIntrusion(attackerIpSource, vectorProfile, targetedP
   notify(`Intrusion Alert Aggregator: Vector registered from ${attackerIpSource}`);
 }
 
-function addCanvasElement(type) {
-  const count = packetCanvasNodes.value.length + 1;
-  const labels = {
-    router: 'Router-Node',
-    switch: 'Switch-Node',
-    firewall: 'FW-Appliance',
-    terminal: 'Linux-Host'
-  };
-  packetCanvasNodes.value = [
-    ...packetCanvasNodes.value,
-    {
-      id: `${type}-${Date.now()}`,
-      type,
-      label: `${labels[type]}-${count}`,
-      left: 32 + ((count * 48) % 540),
-      top: 42 + ((count * 38) % 330)
-    }
-  ];
-}
-
-function clearCanvasField() {
-  packetCanvasNodes.value = [];
-  notify('Canvas map flushed cleanly.');
+function launchVdiSession() {
+  const node = selectedVdiNode.value;
+  vdiConnected.value = true;
+  if (vdiForm.sessionMode === 'GUI') {
+    vdiOutput.value = [
+      `[GUI] Connected to ${node.name} (${node.ip})`,
+      '[GUI] Desktop compositor ready: Fabric Workbench, Packet Console, File Share, Metrics Monitor',
+      '[GUI] Use the session tiles below to inspect system state.'
+    ];
+  } else {
+    vdiOutput.value = [
+      `[CLI] Connected to ${node.name} (${node.ip})`,
+      '[SYSTEM] Session Authenticated. Welcome to Ubuntu Core Appliance Base (x86_64 architecture node link)',
+      "Type 'help' to review simulated operating system guest terminal actions."
+    ];
+  }
 }
 
 function handleVdiCommand() {
+  if (!vdiConnected.value) {
+    launchVdiSession();
+    return;
+  }
+  if (vdiForm.sessionMode === 'GUI') return;
   const command = vdiCommand.value.trim();
   if (!command) return;
   const lower = command.toLowerCase();
@@ -433,7 +489,7 @@ function handleVdiCommand() {
           </div>
         </section>
 
-        <FabricCanvas />
+        <FabricCanvas mode="static" />
       </section>
 
       <section v-if="activeTab === 'servers'" class="tab-page">
@@ -538,7 +594,7 @@ function handleVdiCommand() {
             <button class="primary-button">Execute Trace</button>
           </form>
         </section>
-        <FabricCanvas />
+        <FabricCanvas mode="static" />
         <section class="trace-grid">
           <div class="panel">
             <h3>Active Route Propagation Steps</h3>
@@ -563,7 +619,19 @@ function handleVdiCommand() {
 
       <section v-if="activeTab === 'file-transport'" class="tab-page two-col">
         <section class="panel">
-          <h3>Diagnostic Resource Asset Payload</h3>
+          <h3>Node-to-Node File Share</h3>
+          <div class="form-pair">
+            <label>Source System Node
+              <select v-model="transferForm.sourceNodeId">
+                <option v-for="node in inventory" :key="node.id" :value="node.id">{{ node.name }} · {{ node.ip }}</option>
+              </select>
+            </label>
+            <label>Destination System Node
+              <select v-model="transferForm.destinationNodeId">
+                <option v-for="node in inventory" :key="node.id" :value="node.id">{{ node.name }} · {{ node.ip }}</option>
+              </select>
+            </label>
+          </div>
           <label
             :class="['dropzone', { over: dragOver }]"
             @dragover.prevent="dragOver = true"
@@ -571,11 +639,18 @@ function handleVdiCommand() {
             @drop="handleDrop"
           >
             <strong>Stage Diagnostic Resource Payload</strong>
-            <span>Drag and drop asset definitions or click to select manually</span>
-            <input class="file-input hidden-input" type="file" @change="stageFile" />
+            <span>Drop files/folders here. More than 5 files or any folder is bundled as a ZIP transfer.</span>
+            <input class="file-input hidden-input" type="file" multiple @change="stageFile" />
           </label>
+          <div class="button-row">
+            <label class="secondary-button file-button-label">Upload Files<input class="hidden-input" type="file" multiple @change="stageFile" /></label>
+            <button class="secondary-button amber" type="button" @click="openFolderPicker">Upload Folder</button>
+            <input ref="folderUploadInput" class="hidden-input" type="file" webkitdirectory directory multiple @change="stageFile" />
+          </div>
           <article v-for="file in stagedFiles" :key="file.stagedAssetToken" class="event-row">
-            <strong>{{ file.name }}</strong><span>{{ file.stagedAssetToken }} · {{ file.type }}</span>
+            <strong>{{ file.name }}</strong>
+            <span>{{ file.sourceNode }} -> {{ file.destinationNode }} · {{ file.type }} · {{ file.memberCount }} item{{ file.memberCount === 1 ? '' : 's' }}</span>
+            <small v-if="file.compressed">Compressed bundle: {{ file.members.join(', ') }}</small>
             <div class="button-row">
               <button class="secondary-button" @click="pipeFile(file)">Pipe into SDN</button>
               <button class="danger-button" @click="purgeStagedFile(file.stagedAssetToken)">Purge</button>
@@ -586,7 +661,7 @@ function handleVdiCommand() {
         <section class="panel">
           <h3>Streaming Allocations</h3>
           <article v-for="pipe in pipelines" :key="pipe.pipelineWidgetId" class="event-row">
-            <strong>{{ pipe.assetName }}</strong><span>{{ pipe.pipelineWidgetId }} · {{ pipe.initialState }}</span>
+            <strong>{{ pipe.assetName }}</strong><span>{{ pipe.route }} · {{ pipe.pipelineWidgetId }} · {{ pipe.initialState }}</span>
             <div class="progress-track"><i :style="{ width: `${pipe.progress}%` }"></i></div>
           </article>
           <p v-if="!pipelines.length" class="empty-state">No streaming allocations provisioned.</p>
@@ -638,40 +713,41 @@ function handleVdiCommand() {
           </div>
           <button class="secondary-button" @click="packetCanvasOpen = false">Close</button>
         </header>
-        <div class="modal-body">
-          <aside class="palette">
-            <span>Device Staging Pallet</span>
-            <button @click="addCanvasElement('router')">Core Router</button>
-            <button @click="addCanvasElement('switch')">Layer 3 Switch</button>
-            <button @click="addCanvasElement('firewall')">Security Appliance</button>
-            <button @click="addCanvasElement('terminal')">Linux Host Endpoint</button>
-            <button class="danger-button" @click="clearCanvasField">Flush Working Canvas</button>
-          </aside>
-          <div class="topo-workspace">
-            <p v-if="!packetCanvasNodes.length" class="canvas-empty">Canvas Node Workspace Frame Matrix Empty</p>
-            <article
-              v-for="node in packetCanvasNodes"
-              :key="node.id"
-              class="floating-node"
-              :class="node.type"
-              :style="{ left: `${node.left}px`, top: `${node.top}px` }"
-            >
-              {{ node.label }}
-            </article>
-          </div>
+        <div class="modal-body full">
+          <FabricCanvas mode="designer" />
         </div>
-        <footer>Canvas Engine Render Model: Absolute Positioning Vector Array Matrices <b>Status: Standby Canvas Sandbox Ready</b></footer>
+        <footer>Canvas Engine Render Model: VueFlow node and edge matrices <b>Status: Packet Tracer Sandbox Ready</b></footer>
       </section>
     </div>
 
     <section v-if="vdiOpen" class="vdi-window">
       <header>
         <span class="window-dot red"></span><span class="window-dot yellow"></span><span class="window-dot green"></span>
-        <strong>Guest VM Host VDI Terminal Frame Session</strong>
+        <strong>Guest VM Host VDI Session</strong>
         <button @click="vdiOpen = false">Power</button>
       </header>
-      <pre>{{ vdiOutput.join('\n\n') }}</pre>
-      <label class="vdi-input"><span>guest_vm@fabric-node:~$</span><input v-model="vdiCommand" @keydown.enter="handleVdiCommand" placeholder="Input guest OS subcommands..." /></label>
+      <div class="vdi-picker">
+        <label>Connect Device
+          <select v-model="vdiForm.targetNodeId">
+            <option v-for="node in inventory" :key="node.id" :value="node.id">{{ node.name }} · {{ node.ip }}</option>
+          </select>
+        </label>
+        <label>Session Type
+          <select v-model="vdiForm.sessionMode">
+            <option value="GUI">VDI GUI</option>
+            <option value="CLI">CLI Terminal</option>
+          </select>
+        </label>
+        <button class="primary-button" @click="launchVdiSession">Connect</button>
+      </div>
+      <div v-if="vdiForm.sessionMode === 'GUI' && vdiConnected" class="vdi-desktop">
+        <article><strong>Fabric Workbench</strong><span>{{ selectedVdiNode.name }}</span></article>
+        <article><strong>Packet Console</strong><span>{{ selectedVdiNode.ip }}</span></article>
+        <article><strong>File Share</strong><span>Ready for node transfer</span></article>
+        <article><strong>Metrics Monitor</strong><span>{{ selectedVdiNode.state }}</span></article>
+      </div>
+      <pre v-else>{{ vdiOutput.join('\n\n') }}</pre>
+      <label v-if="vdiForm.sessionMode === 'CLI'" class="vdi-input"><span>guest_vm@fabric-node:~$</span><input v-model="vdiCommand" @keydown.enter="handleVdiCommand" placeholder="Input guest OS subcommands..." /></label>
     </section>
 
     <div v-if="toast" class="toast">{{ toast }}</div>

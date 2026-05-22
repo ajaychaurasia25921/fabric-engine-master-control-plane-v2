@@ -368,8 +368,13 @@ textarea {
 
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 10px;
+}
+
+.file-button-label {
+  display: grid;
+  place-items: center;
 }
 
 .status-chip {
@@ -668,6 +673,12 @@ textarea {
   background: #111827;
 }
 
+.canvas-shell.designer {
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
 .canvas-toolbar {
   display: flex;
   align-items: center;
@@ -710,6 +721,101 @@ textarea {
   border-color: rgba(16, 185, 129, 0.45);
 }
 
+.packet-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  min-height: 0;
+}
+
+.canvas-shell.designer .packet-workbench {
+  grid-template-columns: 230px minmax(0, 1fr) 300px;
+}
+
+.packet-palette,
+.properties-panel {
+  min-height: 0;
+  overflow: auto;
+  border-right: 1px solid #1f2937;
+  padding: 14px;
+  background: #020617;
+}
+
+.properties-panel {
+  border-right: 0;
+  border-left: 1px solid #1f2937;
+}
+
+.packet-palette,
+.packet-palette section,
+.properties-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.packet-palette h2,
+.properties-panel h2 {
+  margin: 0 0 4px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.packet-palette button {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 10px;
+  color: #e5e7eb;
+  background: #111827;
+  text-align: left;
+}
+
+.packet-palette button.active {
+  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(30, 64, 175, 0.28);
+}
+
+.packet-palette button span {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.properties-panel > strong {
+  color: #f8fafc;
+}
+
+.properties-panel p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.properties-panel dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.properties-panel dt {
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.properties-panel dd {
+  margin: -4px 0 0;
+  overflow-wrap: anywhere;
+  color: #e5e7eb;
+  font-size: 12px;
+}
+
 .fabric-canvas {
   width: 100%;
   height: 100%;
@@ -734,8 +840,8 @@ textarea {
 .packet-modal {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(980px, 100%);
-  height: min(680px, calc(100vh - 48px));
+  width: min(1280px, 100%);
+  height: min(760px, calc(100vh - 48px));
   overflow: hidden;
   border: 1px solid rgba(168, 85, 247, 0.45);
   border-radius: 14px;
@@ -770,6 +876,10 @@ textarea {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
   min-height: 0;
+}
+
+.modal-body.full {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .palette {
@@ -843,9 +953,10 @@ textarea {
   left: 320px;
   top: 96px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(540px, calc(100vw - 40px));
-  height: 390px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(620px, calc(100vw - 40px));
+  min-height: 430px;
+  max-height: calc(100vh - 120px);
   overflow: hidden;
   border: 1px solid rgba(245, 158, 11, 0.48);
   border-radius: 14px;
@@ -888,6 +999,53 @@ textarea {
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.vdi-picker {
+  display: grid;
+  grid-template-columns: 1fr 150px 120px;
+  gap: 10px;
+  align-items: end;
+  border-bottom: 1px solid #1f2937;
+  padding: 12px;
+  background: #111827;
+}
+
+.vdi-picker label {
+  display: grid;
+  gap: 5px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.vdi-desktop {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  overflow: auto;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.18), transparent 45%),
+    #020617;
+}
+
+.vdi-desktop article {
+  display: grid;
+  align-content: end;
+  min-height: 110px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px;
+  color: #e5e7eb;
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.vdi-desktop span {
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .vdi-input {
