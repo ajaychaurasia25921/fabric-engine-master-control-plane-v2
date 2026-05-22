@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: fabric-control-plane-v2
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      init:
+        pull-model-strategy: when_missing
+        timeout: 10m
+        max-retries: 2
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:llama3.2:3b}
+          temperature: 0.2
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+  r2dbc:
+    url: r2dbc:h2:mem:///fabric;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+
+fabric:
+  openapi-path: ../openapi.yml
+  telemetry:
+    demo-events-enabled: true
+  smpp:
+    host: smpp.example.internal
+    port: 2775
+    system-id: fabric-engine
+    password: change-me

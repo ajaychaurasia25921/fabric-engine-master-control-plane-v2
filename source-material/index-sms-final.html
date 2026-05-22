@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fabric Engine - Single Master Control Plane</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Custom interface state utilities from file-sharing engine */
+    .file-drag-over {
+      border-color: #3b82f6 !important;
+      background-color: rgba(30, 58, 138, 0.4) !important;
+      box-shadow: inset 0 0 15px rgba(59, 130, 246, 0.3);
+    }
+    .focused-asset {
+      background-color: #1e293b !important;
+      border-left: 4px solid #3b82f6 !important;
+    }
+    /* Optimized scrollbar configurations for densified data boards */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans antialiased flex selection:bg-blue-600/40">
+
+  <aside class="w-64 bg-gray-950 border-r border-gray-800 p-6 flex flex-col justify-between fixed h-full z-30">
+    <div>
+      <div class="mb-6 flex items-center gap-3">
+        <div class="bg-blue-600/10 p-2.5 rounded-xl border border-blue-500/20 text-blue-500 shadow-inner shrink-0">
+          <i class="fa-solid fa-circle-nodes text-xl animate-pulse"></i>
+        </div>
+        <div>
+          <h1 class="text-md font-bold text-white tracking-widest uppercase font-mono">Fabric Engine</h1>
+          <p class="text-[10px] text-gray-500 font-mono">v2.1.0 • MULTI-CLUSTER</p>
+        </div>
+      </div>
+      
+      <nav class="space-y-1">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left bg-blue-600 text-white shadow-md transition">
+          <i class="fa-solid fa-chart-pie w-4 text-center"></i> Main Dashboard
+        </button>
+        <button onclick="switchTab('servers')" id="nav-servers" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-server w-4 text-center"></i> Enterprise Provisioning
+        </button>
+        <button onclick="switchTab('sms-gateway')" id="nav-sms-gateway" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-comments w-4 text-center text-blue-400"></i> SMS Gateway Hub
+        </button>
+        <button onclick="switchTab('terminal-access')" id="nav-terminal-access" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-terminal w-4 text-center"></i> SSH / Telnet Terminals
+        </button>
+        <button onclick="switchTab('security-plane')" id="nav-security-plane" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-shield-halved w-4 text-center"></i> Firewall & Honeypots
+        </button>
+        <button onclick="switchTab('packet-tracing')" id="nav-packet-tracing" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-route w-4 text-center"></i> CCNP Packet Tracing
+        </button>
+        <button onclick="switchTab('file-transport')" id="nav-file-transport" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-right-left w-4 text-center"></i> File Transport Plane
+        </button>
+        <button onclick="switchTab('quantum')" id="nav-quantum" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-atom w-4 text-center"></i> Quantum Core
+        </button>
+        <button onclick="switchTab('networking')" id="nav-networking" class="w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition">
+          <i class="fa-solid fa-network-wired w-4 text-center"></i> L7 Sockets
+        </button>
+      </nav>
+    </div>
+
+    <div class="border-t border-gray-800 pt-4 space-y-2">
+      <div class="space-y-1.5 mb-2">
+        <button onclick="openPacketTracerCanvas()" class="w-full flex items-center justify-between px-3 py-1.5 rounded bg-purple-950/40 text-purple-400 border border-purple-800/40 font-mono text-[11px] hover:bg-purple-900/40 transition">
+          <span><i class="fa-solid fa-diagram-project mr-1.5"></i> Packet Canvas</span>
+          <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+        </button>
+        <button onclick="openVdiTerminalWindow()" class="w-full flex items-center justify-between px-3 py-1.5 rounded bg-amber-950/40 text-amber-400 border border-amber-800/40 font-mono text-[11px] hover:bg-amber-900/40 transition">
+          <span><i class="fa-solid fa-desktop mr-1.5"></i> VDI Workspace</span>
+          <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+        </button>
+      </div>
+      <div class="text-[11px] text-gray-500">
+        <span class="block text-gray-400 font-semibold mb-1 uppercase tracking-wider text-[9px]">Gateway Sync Target:</span>
+        <select id="apiBaseSelector" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-blue-400 font-mono focus:outline-none cursor-pointer">
+          <option value="http://localhost:8080/api/v1" selected>localhost:8080 (Dev)</option>
+          <option value="https://api.sdn.network.engine.internal/api/v1">api.sdn.network.engine.internal</option>
+        </select>
+      </div>
+    </div>
+  </aside>
+
+  <div class="flex-1 pl-64 flex flex-col min-h-screen">
+    
+    <header class="bg-gray-900/60 backdrop-blur-md border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-20 shadow-xl">
+      <div>
+        <h2 id="pageTitle" class="text-lg font-bold tracking-tight text-white">System Infrastructure Control Room</h2>
+        <p id="pageSubtitle" class="text-xs text-gray-400 mt-0.5">Unified master plane lifecycle validation interface.</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center space-x-2 bg-gray-950 px-3 py-1.5 rounded-lg border border-gray-800 text-xs font-mono shrink-0">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+          </span>
+          <span class="text-[10px] font-bold tracking-wider text-green-400 uppercase">mTLS + OAuth2 Connected</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-6 flex-1 space-y-6 max-w-[1920px] mx-auto w-full">
+
+      <div id="tab-dashboard" class="tab-content space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Hypervisor VMs</p>
+              <h4 class="text-xl font-bold mt-1 text-gray-100" id="vmCounter">2 / 3 Running</h4>
+            </div>
+            <div class="text-blue-500 bg-blue-500/10 p-2.5 rounded-lg"><i class="fa-solid fa-server text-lg"></i></div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Honeypot Decoys</p>
+              <h4 class="text-xl font-bold mt-1 text-emerald-400" id="honeypotCounter">3 Active</h4>
+            </div>
+            <div class="text-emerald-500 bg-emerald-500/10 p-2.5 rounded-lg"><i class="fa-solid fa-spider text-lg"></i></div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Firewall Drops</p>
+              <h4 class="text-xl font-bold mt-1 text-red-400" id="firewallDropCounter">1,842</h4>
+            </div>
+            <div class="text-red-500 bg-red-500/10 p-2.5 rounded-lg"><i class="fa-solid fa-ban text-lg"></i></div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">CCNP Node Links</p>
+              <h4 class="text-xl font-bold mt-1 text-purple-400">4 Active Pipes</h4>
+            </div>
+            <div class="text-purple-500 bg-purple-500/10 p-2.5 rounded-lg"><i class="fa-solid fa-route text-lg"></i></div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg flex items-center justify-between">
+            <div>
+              <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Quantum Volume</p>
+              <h4 class="text-xl font-bold mt-1 text-amber-400">2,048</h4>
+            </div>
+            <div class="text-amber-500 bg-amber-500/10 p-2.5 rounded-lg"><i class="fa-solid fa-wand-magic-sparkles text-lg"></i></div>
+          </div>
+        </div>
+
+        <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl">
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <div>
+              <h3 class="text-md font-bold text-white">Hypervisor Cluster Nodes & VM Compute Instances</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Live hypervisor states showing microcode architectures and dynamic startup routines.</p>
+            </div>
+            <button onclick="triggerCoordinateScramble()" class="bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800/60 font-mono text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 shadow-lg">
+              <i class="fa-solid fa-shuffle"></i> SCRAMBLE IP COORDINATES
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-gray-300">
+              <thead class="bg-gray-950 text-[11px] font-bold uppercase text-gray-400 tracking-wider border-b border-gray-800">
+                <tr>
+                  <th class="p-3">Instance / VM Label</th>
+                  <th class="p-3">Role / Service Class</th>
+                  <th class="p-3">Hypervisor Platform</th>
+                  <th class="p-3">Target IP Address</th>
+                  <th class="p-3">Uptime Boundary</th>
+                  <th class="p-3">Current Execution State</th>
+                  <th class="p-3 text-right">Compute Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody" class="divide-y divide-gray-800/60 font-mono"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div id="tab-servers" class="tab-content hidden space-y-6">
+        <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-xl max-w-4xl">
+          <div class="mb-4 pb-3 border-b border-gray-800">
+            <span class="bg-emerald-600 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded shadow-sm">POST</span>
+            <code class="text-gray-400 font-mono text-xs ml-2">/systems/servers</code>
+            <h3 class="text-md font-bold mt-1 text-white">Provision New Cluster Core Node Instance</h3>
+          </div>
+
+          <form id="serverProvisionForm" onsubmit="handleServerProvision(event)" class="space-y-4 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block font-bold text-gray-400 uppercase tracking-wider mb-1.5">Server Display Tag</label>
+                <input type="text" id="srvName" required value="prod-zone-edge-hypervisor" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 text-white focus:border-blue-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-400 uppercase tracking-wider mb-1.5">Parent Hardware UUID Mapping</label>
+                <input type="text" id="srvHostNode" required value="4fa218ce-bc31-4122-aa11-82ff3b1029da" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 font-mono text-white focus:border-blue-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block font-bold text-gray-400 uppercase tracking-wider mb-1.5">Deployment Framework Target</label>
+                <select id="srvDeploymentType" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 text-white focus:border-blue-500 focus:outline-none">
+                  <option value="BARE_METAL_PHYSICAL">BARE_METAL_PHYSICAL (Native x86_64 Assemblies)</option>
+                  <option value="VIRTUAL_MACHINE" selected>VIRTUAL_MACHINE (QEMU/KVM Virtual Allocation)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-bold text-gray-400 uppercase tracking-wider mb-1.5">Execution Framework Scope</label>
+                <select id="srvExecutionProfile" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 text-white focus:border-blue-500 focus:outline-none">
+                  <option value="REAL" selected>REAL (Live Network Node Deployment Fabric)</option>
+                  <option value="SIMULATED">SIMULATED (Internal Mock Layer Sandbox Layout)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="space-y-2 pt-2">
+              <label class="block font-bold text-gray-400 uppercase tracking-wider">Dynamic Role Specific Subschema Settings</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" onclick="switchRoleSchema('DATABASE_SERVER')" id="btn-role-db" class="px-3 py-1.5 rounded-lg border font-medium bg-gray-950 text-blue-400 border-blue-500/40 shadow-sm transition">Database Engine</button>
+                <button type="button" onclick="switchRoleSchema('APPLICATION_SERVER')" id="btn-role-app" class="px-3 py-1.5 rounded-lg border font-medium bg-gray-950 text-gray-400 border-gray-800 hover:border-gray-700 transition">Application Host</button>
+                <button type="button" onclick="switchRoleSchema('HONEYPOT_DECOY')" id="btn-role-honey" class="px-3 py-1.5 rounded-lg border font-medium bg-gray-950 text-gray-400 border-gray-800 hover:border-gray-700 transition">Honeypot Decoy Target</button>
+              </div>
+            </div>
+
+            <div id="subschema-DATABASE_SERVER" class="role-subschema p-3 bg-gray-950 rounded-lg border border-gray-800 space-y-3">
+              <h4 class="font-bold text-blue-400 flex items-center gap-2 font-mono"><i class="fa-solid fa-database"></i> Database Cluster Configuration Properties (`dbRoleConfig`)</h4>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] text-gray-400 mb-1">Database Engine Target</label>
+                  <select id="dbEngine" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white">
+                    <option value="POSTGRESQL" selected>POSTGRESQL Core Distributed Fabric</option>
+                    <option value="MONGO_DB">MONGO_DB Cluster Shards</option>
+                    <option value="MySQL">MYSQL Core Distributed Fabric</option>
+                    <option value="MS_SQL">MS SQL Cluster Shards</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-400 mb-1">Local Listening Target Port</label>
+                  <input type="number" id="dbPort" value="5432" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white font-mono">
+                </div>
+              </div>
+            </div>
+
+            <div id="subschema-APPLICATION_SERVER" class="role-subschema hidden p-3 bg-gray-950 rounded-lg border border-gray-800 space-y-3">
+              <h4 class="font-bold text-blue-400 flex items-center gap-2 font-mono"><i class="fa-solid fa-code"></i> Application Microservice Configuration Profile (`appRoleConfig`)</h4>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] text-gray-400 mb-1">Runtime Environment Profile</label>
+                  <input type="text" id="appRuntime" value="NODEJS_V8" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white font-mono">
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-400 mb-1">Target Application Service Port</label>
+                  <input type="number" id="appPort" value="8080" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white font-mono">
+                </div>
+              </div>
+            </div>
+
+            <div id="subschema-HONEYPOT_DECOY" class="role-subschema hidden p-3 bg-gray-950 rounded-lg border border-gray-800 space-y-3">
+              <h4 class="font-bold text-emerald-400 flex items-center gap-2 font-mono"><i class="fa-solid fa-mask"></i> Attack Deflection Decoy Parameters (`honeypotConfig`)</h4>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] text-gray-400 mb-1">Simulated Vulnerability Mock Persona</label>
+                  <select id="honeyPersona" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white">
+                    <option value="VULNERABLE_SSH" selected>Vulnerable OpenSSH v7.2 Banner Emulation</option>
+                    <option value="EXPOSED_TELNET">Legacy Telnet Root Prompt (No Crypto)</option>
+                    <option value="EXPOSED_REDIS">Unauthenticated Redis DB In-Memory Store</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-400 mb-1">Telemetry Attack Incident Alerting Aggregator Queue</label>
+                  <input type="text" id="honeyLogQueue" value="amqp://sec-broker/alerts.honeypot" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white font-mono">
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-lg transition shadow-lg">
+              <i class="fa-solid fa-square-plus mr-1"></i> SPARK LIFECYCLE PROVISIONING INSTANCE
+            </button>
+          </form>
+        </section>
+      </div>
+
+      <div id="tab-sms-gateway" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl lg:col-span-1 space-y-4">
+            <div>
+              <div class="flex justify-between items-center pb-2 border-b border-gray-800">
+                <h3 class="text-md font-bold text-white">SMS Dispatch Terminal</h3>
+                <span class="bg-blue-500/10 text-blue-400 text-[10px] font-mono px-2 py-0.5 rounded border border-blue-500/20 uppercase">Acknowledge Ready</span>
+              </div>
+              <p class="text-xs text-gray-400 mt-1">Broadcast high-priority critical warning anomalies or system auth strings.</p>
+            </div>
+
+            <form id="smsGatewayForm" onsubmit="handleSmsDispatch(event)" class="space-y-3 text-xs">
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1 tracking-wider">Upstream Provider Routing API</label>
+                <select id="smsProvider" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 font-mono text-white focus:border-blue-500 focus:outline-none">
+                  <option value="TWILIO_REST">Twilio Distributed Messaging Node</option>
+                  <option value="AWS_SNS_SMS">Amazon Web Services SNS Gateway</option>
+                  <option value="INFOBIP_CORE">Infobip Global Telco Ingestion</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1 tracking-wider">Destination Mobile MSISDN</label>
+                <input type="text" id="smsRecipient" required value="+1 (555) 019-2834" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 font-mono text-white focus:border-blue-500 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1 tracking-wider">Alphanumeric Sender ID Mask</label>
+                <input type="text" id="smsSenderId" value="FABRIC_ENG" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 font-mono text-white focus:border-blue-500 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1 tracking-wider">SMS Payload Content Stream</label>
+                <textarea id="smsMessage" rows="3" required class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 text-white font-mono text-xs focus:border-blue-500 focus:outline-none resize-none">CRITICAL_ALERT: Hypervisor core node cluster [prod-zone-edge] triggered microcode validation failure. Action required.</textarea>
+              </div>
+
+              <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-2.5 rounded-lg transition uppercase tracking-wider font-mono text-xs shadow-md flex items-center justify-center gap-2">
+                <i class="fa-solid fa-paper-plane"></i> Dispatch SMS Pipeline
+              </button>
+            </form>
+          </section>
+
+          <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl lg:col-span-2 flex flex-col justify-between">
+            <div class="space-y-4 flex-1 flex flex-col">
+              <div class="flex justify-between items-center pb-2 border-b border-gray-800">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 font-mono flex items-center gap-2">
+                  <i class="fa-solid fa-network-wired text-blue-500 animate-pulse"></i> Webhook Callback Callback Matrix (`smsWebhookConfigs`)
+                </h4>
+                <span class="bg-gray-950 border border-gray-800 text-green-400 text-[10px] font-mono px-2 py-0.5 rounded uppercase">Active Listening</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs p-3 bg-gray-950 rounded-lg border border-gray-800 items-end">
+                <div class="md:col-span-2">
+                  <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wider">Target Endpoint URL Destination</label>
+                  <input type="url" id="smsWebhookUrl" value="https://api.internal.security.monitor/webhooks/sms-receipt" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 font-mono text-white focus:outline-none">
+                </div>
+                <button onclick="saveSmsWebhook()" class="w-full bg-blue-950/60 hover:bg-blue-900 text-blue-400 border border-blue-800 font-mono font-bold py-1.5 rounded text-xs transition">
+                  Bind Webhook
+                </button>
+              </div>
+
+              <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono pt-2">Live Transmission Loop Realtime Audit Logs</h4>
+              <div id="smsGatewayLogsFrame" class="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-xs text-blue-400 overflow-y-auto flex-1 min-h-[160px] space-y-1.5 max-h-[220px]">
+                <p class="text-gray-500 italic">[00:00:01] System localized message broker pipeline initialized successfully.</p>
+                <p class="text-gray-500 italic">[00:05:12] Heartbeat check on provider endpoint (TWILIO_REST) -> 200 OK.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div id="tab-terminal-access" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl lg:col-span-1 space-y-4">
+            <div>
+              <h3 class="text-md font-bold text-white">Initiate Remote VTY Core Session</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Secure crypto or legacy unencrypted console loops.</p>
+            </div>
+
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1">Target Cluster Endpoint Address / Host</label>
+                <select id="termTargetIp" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 font-mono text-white">
+                  <option value="10.194.24.102">10.194.24.102 (Core Gateway)</option>
+                  <option value="10.194.24.220">10.194.24.220 (Decoy Router Trap)</option>
+                  <option value="192.168.1.1">192.168.1.1 (CCNP Edge Core-R1)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1">Transport Layer Protocol System</label>
+                <div class="flex gap-4">
+                  <label class="flex items-center gap-1.5 cursor-pointer text-gray-300">
+                    <input type="radio" name="termProto" value="SSH" checked class="accent-blue-500"> SSH (Port 22 Crypto)
+                  </label>
+                  <label class="flex items-center gap-1.5 cursor-pointer text-gray-300">
+                    <input type="radio" name="termProto" value="TELNET" class="accent-amber-500"> Telnet (Port 23 Cleartext)
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-bold text-gray-400 uppercase mb-1">Access Authentication Username</label>
+                <input type="text" id="termUser" value="cisco_admin" class="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 font-mono text-white">
+              </div>
+
+              <button onclick="launchTerminalConsoleConnection()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-2.5 rounded-lg transition uppercase tracking-wider font-mono text-xs shadow-md">
+                <i class="fa-solid fa-plug mr-1.5"></i> Open Remote Terminal Frame
+              </button>
+            </div>
+          </section>
+
+          <section class="bg-gray-955 border border-gray-800 rounded-xl p-5 shadow-xl lg:col-span-2 flex flex-col h-[420px]">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-gray-800">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 font-mono flex items-center gap-2">
+                <i class="fa-solid fa-terminal text-blue-500 animate-pulse"></i> Interactive Shell Access Buffer Terminal
+              </h4>
+              <span id="termActiveProtocolBadge" class="bg-gray-900 border border-gray-700 text-gray-500 text-[10px] font-mono px-2 py-0.5 rounded uppercase">
+                Disconnected
+              </span>
+            </div>
+
+            <div id="terminalBodyFrame" class="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-xs text-green-400 overflow-y-auto flex-1 space-y-2 leading-relaxed">
+              <p class="text-gray-500 italic">Terminal Shell Console pipeline standby state. Select connection parameters and trigger "Open Remote Terminal Frame" above to initialize connection loops...</p>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1">
+              <span class="text-blue-500 font-mono font-bold text-xs select-none" id="termPromptIndicator">$</span>
+              <input type="text" id="termConsoleInputCommandLine" disabled placeholder="Establish session terminal connection first..." onkeydown="handleTerminalCommandExecution(event)" class="bg-transparent text-gray-100 font-mono text-xs w-full focus:outline-none placeholder-gray-600">
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <div id="tab-security-plane" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          
+          <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start mb-4 pb-2 border-b border-gray-800">
+                <div>
+                  <h3 class="text-md font-bold text-white">L4 State Inspection Firewall ACL Engine</h3>
+                  <p class="text-xs text-gray-400 mt-0.5">Define active micro-segmentation policies across hypervisor network bridges.</p>
+                </div>
+                <span class="bg-red-500/10 text-red-400 text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-red-500/20 uppercase animate-pulse">Filtering Active</span>
+              </div>
+
+              <div class="grid grid-cols-4 gap-2 text-xs mb-4 p-3 bg-gray-950 rounded-lg border border-gray-800 items-end">
+                <div>
+                  <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Source CIDR</label>
+                  <input type="text" id="fwSrc" value="10.0.0.0/8" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 font-mono text-white">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Port / Protocol</label>
+                  <input type="text" id="fwPort" value="23/TCP" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 font-mono text-white">
+                </div>
+                <div>
+                  <label class="block text-[10px] text-gray-400 font-bold mb-1 uppercase">Policy Rule</label>
+                  <select id="fwAction" class="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-white">
+                    <option value="DROP" selected>DROP (Silent Discard)</option>
+                    <option value="ACCEPT">ACCEPT (Allow Stream)</option>
+                  </select>
+                </div>
+                <button onclick="commitFirewallRule()" class="w-full bg-red-900 hover:bg-red-800 text-red-200 font-mono font-bold py-1.5 rounded text-xs transition border border-red-700">
+                  Inject ACL
+                </button>
+              </div>
+
+              <div class="space-y-1 font-mono text-xs max-h-[180px] overflow-y-auto">
+                <div class="flex justify-between p-2 bg-gray-950 border border-gray-800 rounded text-gray-400 font-bold text-[10px] uppercase">
+                  <span>Source Network Target</span>
+                  <span>Port Destination</span>
+                  <span>Policy Action</span>
+                </div>
+                <div id="firewallRuleContainer" class="space-y-1"></div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-gray-800 flex justify-between items-center text-xs">
+              <span class="text-gray-400 font-mono">Last Evaluated Drop Stream Sequence:</span>
+              <span class="text-red-400 font-mono font-bold animate-pulse" id="fwTelemetryLog">Dropped packet from 185.220.101.4 -> 10.194.24.102:23</span>
+            </div>
+          </section>
+
+          <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start mb-4 pb-2 border-b border-gray-800">
+                <div>
+                  <h3 class="text-md font-bold text-white">Distributed Honeypot Deception Intrusion Fabric</h3>
+                  <p class="text-xs text-gray-400 mt-0.5">Simulate vulnerable endpoints to gather attacker signature matrices.</p>
+                </div>
+                <span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-emerald-500/20 uppercase">Telemetry Hooked</span>
+              </div>
+
+              <div class="p-3 bg-gray-950 border border-gray-800 rounded-xl space-y-2 mb-4">
+                <h4 class="text-[11px] font-bold text-amber-500 uppercase tracking-wider font-mono">Simulate Attacker Intrusion vectors (Manual Testing Trigger)</h4>
+                <div class="grid grid-cols-2 gap-2">
+                  <button onclick="triggerFakeHoneypotIntrusion('198.51.100.42', 'VULNERABLE_SSH', 22)" class="bg-gray-900 hover:bg-gray-800 text-left p-2 rounded border border-gray-700 text-xs transition font-mono">
+                    <span class="text-red-400 block font-bold">» Inject SSH Brute Force Attack</span>
+                    <span class="text-[10px] text-gray-500">Targeting root credentials decoy banner v7.2</span>
+                  </button>
+                  <button onclick="triggerFakeHoneypotIntrusion('203.0.113.89', 'EXPOSED_TELNET', 23)" class="bg-gray-900 hover:bg-gray-800 text-left p-2 rounded border border-gray-700 text-xs transition font-mono">
+                    <span class="text-amber-400 block font-bold">» Inject Telnet Injection Command</span>
+                    <span class="text-[10px] text-gray-500">Targeting port 23 plain text interactive console terminal</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="space-y-1.5 max-h-[160px] overflow-y-auto" id="honeypotAlertLogsContainer">
+                <div id="honeypotEmptyState" class="text-center py-6 text-xs text-gray-500 italic font-mono bg-gray-950/40 rounded border border-dashed border-gray-800">
+                  No active high-severity intrusion indicators triggered in this epoch frame window.
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <div id="tab-packet-tracing" class="tab-content hidden space-y-6">
+        <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl">
+          <div class="mb-4 pb-3 border-b border-gray-800 flex justify-between items-center">
+            <div>
+              <h3 class="text-md font-bold text-white">CCNP Enterprise Level Multi-Hop Packet Inspection Tracing Engine</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Simulate dynamic path vector calculations across BGP, OSPF routing configurations and Layer 2 VLAN tags.</p>
+            </div>
+            <span class="bg-purple-600 text-white font-mono font-bold text-[10px] px-2 py-0.5 rounded shadow">SDN CONTROLLER PLANE v4</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs mb-6 p-4 bg-gray-950 rounded-xl border border-gray-800">
+            <div>
+              <label class="block font-bold text-gray-400 mb-1 uppercase tracking-wider">Source Point Node</label>
+              <select id="traceSrcNode" class="w-full bg-gray-900 border border-gray-700 rounded p-2 font-mono text-white">
+                <option value="Host-Alpha (VLAN 10)">Host-Alpha (VLAN 10, Core Space)</option>
+                <option value="Edge-Router-R1">Edge-Router-R1 (Autonomous AS-65001)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-gray-400 mb-1 uppercase tracking-wider">Destination IP Node</label>
+              <input type="text" id="traceDstIp" value="10.194.24.102" class="w-full bg-gray-900 border border-gray-700 rounded p-2 font-mono text-white">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-400 mb-1 uppercase tracking-wider">Protocol Dialect</label>
+              <select id="traceProto" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white">
+                <option value="ICMP_ECHO">ICMP Echo Request (Ping Frame)</option>
+                <option value="TCP_SYN">TCP SYN (Handshake Sequence Core)</option>
+                <option value="BGP_UPDATE">BGP Path Attribute Update (AS-PATH)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-gray-400 mb-1 uppercase tracking-wider">Encapsulation / Tag</label>
+              <select id="traceTag" class="w-full bg-gray-900 border border-gray-700 rounded p-2 font-mono text-white">
+                <option value="802.1Q VLAN 10">802.1Q Tagged (VLAN 10 Link)</option>
+                <option value="MPLS LABEL 402">MPLS Label Switching Frame (Tag 402)</option>
+                <option value="NONE_RAW">Standard Native L3 Packet Data</option>
+              </select>
+            </div>
+            <div>
+              <label class="block opacity-0 mb-1">Trigger</label>
+              <button onclick="executeCcnpPacketSequenceTrace()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-mono font-bold p-2 rounded transition shadow flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-bolt animate-bounce"></i> Trace Packet Hop
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
+            <div class="lg:col-span-1 bg-gray-950 p-4 rounded-xl border border-gray-800 space-y-4">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-purple-400 border-b border-gray-800 pb-2">Active Route Propagation Steps</h4>
+              <div id="hopChainContainer" class="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-800">
+                <p class="text-gray-500 italic text-center py-4">Trigger trace configuration to display hop vector progressions.</p>
+              </div>
+            </div>
+            <div class="lg:col-span-2 bg-gray-950 p-4 rounded-xl border border-gray-800 flex flex-col h-[320px]">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 border-b border-gray-800 pb-2 flex justify-between items-center">
+                <span>Layer 2 / Layer 3 / Layer 4 Hex Protocol Encapsulation Decoder Frame</span>
+                <span class="text-[10px] text-gray-600 font-mono" id="packetByteWeight">0 bytes parsed</span>
+              </h4>
+              <pre id="packetHexDumpFrame" class="bg-gray-900 border border-gray-800 rounded-lg p-3 text-emerald-500 overflow-y-auto flex-1 mt-3 font-mono leading-relaxed">Awaiting SDN Packet Dispatch Trigger Matrix...</pre>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="tab-file-transport" class="tab-content hidden space-y-6">
+        <section class="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-xl">
+          <div class="mb-4 pb-2 border-b border-gray-800 flex justify-between items-center">
+            <div>
+              <h3 class="text-md font-bold text-white">File Transport Plane Broker</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Asynchronous side-channel ingestion and network resource attachment sandbox.</p>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs">
+            <div class="lg:col-span-1 space-y-4">
+              <div id="dropzoneContainer" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDropEvent(event)" class="border-2 border-dashed border-gray-700 hover:border-gray-600 bg-gray-950 p-6 rounded-xl flex flex-col items-center justify-center text-center transition cursor-pointer group">
+                <div class="bg-blue-600/10 p-3 rounded-full text-blue-400 mb-2 group-hover:scale-110 transition"><i class="fa-solid fa-cloud-arrow-up text-xl"></i></div>
+                <p class="font-bold text-gray-300">Stage Diagnostic Resource Payload</p>
+                <p class="text-[11px] text-gray-500 mt-0.5">Drag & drop asset definitions or click to select manually</p>
+                <input type="file" id="binaryPayloadHiddenInput" class="hidden" onchange="handleManualFileSelection(event)">
+              </div>
+              <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 space-y-2">
+                <h4 class="font-bold text-gray-400 uppercase tracking-wider text-[10px]">Active Data Pipeline Sub-Channels</h4>
+                <div id="pipeTrackerContainer" class="space-y-1.5 font-mono text-[11px]">
+                  <p id="emptyPipesFallback" class="text-gray-600 italic py-2 text-center">No streaming allocations provisioned.</p>
+                </div>
+              </div>
+            </div>
+            <div class="lg:col-span-2 bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col h-[340px]">
+              <h4 class="font-bold text-gray-400 uppercase tracking-wider text-[10px] border-b border-gray-800 pb-2">Active Staged Blob Attachments Cluster Mirror</h4>
+              <div id="stagedFilesContainer" class="flex-1 overflow-y-auto mt-2 space-y-2 pr-1">
+                <p id="emptyAttachmentsFallback" class="text-gray-600 italic py-8 text-center font-mono">Cluster attachment storage array empty.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      const activeContent = document.getElementById(`tab-${tabId}`);
+      if (activeContent) activeContent.classList.remove('hidden');
+
+      document.querySelectorAll('nav button').forEach(btn => {
+        btn.className = "w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left text-gray-400 hover:bg-gray-900 hover:text-white transition";
+      });
+      const activeNav = document.getElementById(`nav-${tabId}`);
+      if (activeNav) {
+        activeNav.className = "w-full flex items-center gap-3 px-4 py-2 rounded font-medium text-xs text-left bg-blue-600 text-white shadow-md transition";
+      }
+
+      // Dynamically re-index page headers
+      const titleEl = document.getElementById('pageTitle');
+      const subtitleEl = document.getElementById('pageSubtitle');
+      if (tabId === 'dashboard') {
+        titleEl.innerText = "System Infrastructure Control Room";
+        subtitleEl.innerText = "Unified master plane lifecycle validation interface.";
+      } else if (tabId === 'servers') {
+        titleEl.innerText = "Enterprise Infrastructure Core Provisioning Platform";
+        subtitleEl.innerText = "Provision physical environments or QEMU containers instantly.";
+      } else if (tabId === 'sms-gateway') {
+        titleEl.innerText = "SMS Telecom Gateway Aggregator Hub";
+        subtitleEl.innerText = "Realtime critical SMS alerting dispatcher framework and transaction monitor.";
+      } else if (tabId === 'terminal-access') {
+        titleEl.innerText = "Virtual Terminal Cryptographic Control Line";
+        subtitleEl.innerText = "Distributed terminal console interaction space.";
+      } else if (tabId === 'security-plane') {
+        titleEl.innerText = "L4 Segments Security & Deception Fabric Plane";
+        subtitleEl.innerText = "Inject firewall rules and collect telemetry records from fake decoy honeypots.";
+      } else if (tabId === 'packet-tracing') {
+        titleEl.innerText = "CCNP Multi-Hop Route Tracing Console";
+        subtitleEl.innerText = "Trace abstract protocol payloads across dynamic autonomous network pathways.";
+      } else if (tabId === 'file-transport') {
+        titleEl.innerText = "Asynchronous Data Payload Pipeline Transport";
+        subtitleEl.innerText = "Stage diagnostic structures or software bundles into localized spaces.";
+      }
+    }
+
+    // Server Roles Layout Toggle Switches
+    function switchRoleSchema(roleType) {
+      document.querySelectorAll('.role-subschema').forEach(el => el.classList.add('hidden'));
+      const activeSub = document.getElementById(`subschema-${roleType}`);
+      if (activeSub) activeSub.classList.remove('hidden');
+
+      const buttons = {
+        'DATABASE_SERVER': 'btn-role-db',
+        'APPLICATION_SERVER': 'btn-role-app',
+        'HONEYPOT_DECOY': 'btn-role-honey'
+      };
+      Object.entries(buttons).forEach(([key, id]) => {
+        const btn = document.getElementById(id);
+        if (key === roleType) {
+          btn.className = "px-3 py-1.5 rounded-lg border font-medium bg-gray-950 text-blue-400 border-blue-500/40 shadow-sm transition";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg border font-medium bg-gray-950 text-gray-400 border-gray-800 hover:border-gray-700 transition";
+        }
+      });
+    }
+
+    // Mock Action: Scramble Coordinates
+    function triggerCoordinateScramble() {
+      showNotificationToast("Re-indexing node addresses and applying fresh virtual routing network masks...", false);
+    }
+
+    // Notification framework alert toast engine
+    function showNotificationToast(displayMessageText, flagAsErrorCondition) {
+      const toastFrameElement = document.createElement('div');
+      toastFrameElement.className = `fixed bottom-4 right-4 z-50 border ${flagAsErrorCondition ? 'bg-red-950/95 border-red-800 text-red-200' : 'bg-gray-900/95 border-gray-800 text-gray-200'} text-xs px-4 py-3 rounded-xl shadow-2xl font-mono flex items-center space-x-3 transition-all duration-300 transform translate-y-12 opacity-0`;
+      toastFrameElement.innerHTML = `<i class="fa-solid ${flagAsErrorCondition ? 'fa-square-exclamation text-red-500' : 'fa-circle-info text-blue-400'} text-sm shrink-0"></i> <span>${displayMessageText}</span>`;
+      document.body.appendChild(toastFrameElement);
+      
+      setTimeout(() => toastFrameElement.classList.remove('translate-y-12', 'opacity-0'), 50);
+      setTimeout(() => {
+        toastFrameElement.classList.add('translate-y-12', 'opacity-0');
+        setTimeout(() => toastFrameElement.remove(), 350);
+      }, 4000);
+    }
+
+    // SMS Dispatch Simulation Logic
+    function handleSmsDispatch(event) {
+      event.preventDefault();
+      const provider = document.getElementById('smsProvider').value;
+      const recipient = document.getElementById('smsRecipient').value;
+      const msg = document.getElementById('smsMessage').value;
+      
+      showNotificationToast(`SMS sequence successfully submitted via upstream cluster connection channel!`, false);
+      
+      const logsFrame = document.getElementById('smsGatewayLogsFrame');
+      const timeStamp = new Date().toLocaleTimeString();
+      logsFrame.innerHTML += `<p class="text-emerald-400 font-bold">[${timeStamp}] [DISPATCH] Source: Local Plane -> Provider: ${provider} -> Recipient: ${recipient} -> STATUS: SENT_SUCCESS_OK</p>`;
+      logsFrame.scrollTop = logsFrame.scrollHeight;
+    }
+
+    // Save Webhook Callback Simulation
+    function saveSmsWebhook() {
+      const url = document.getElementById('smsWebhookUrl').value;
+      if (!url) {
+        showNotificationToast("Invalid URL provided for webhook link registration.", true);
+        return;
+      }
+      showNotificationToast(`Successfully bound SMS callback hook context: ${url}`, false);
+      const logsFrame = document.getElementById('smsGatewayLogsFrame');
+      const timeStamp = new Date().toLocaleTimeString();
+      logsFrame.innerHTML += `<p class="text-purple-400">[${timeStamp}] [WEBHOOK_REGISTER] Binding update completed for active payload status notifications.</p>`;
+      logsFrame.scrollTop = logsFrame.scrollHeight;
+    }
+
+    // Fallback UI Setup Initializations
+    window.addEventListener('DOMContentLoaded', () => {
+      // Setup default mock row elements into inventories
+      const tbody = document.getElementById('inventoryTableBody');
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr class="hover:bg-gray-900/40 transition">
+            <td class="p-3 text-white font-bold">prod-zone-edge-hypervisor</td>
+            <td class="p-3 text-blue-400">DATABASE_SERVER</td>
+            <td class="p-3 text-gray-400">QEMU/KVM Cluster Allocator</td>
+            <td class="p-3 text-gray-300 font-mono">10.194.24.102</td>
+            <td class="p-3 text-gray-400">142h 11m</td>
+            <td class="p-3"><span class="bg-green-950/60 border border-green-800 text-green-400 text-[10px] px-1.5 py-0.5 rounded font-bold">RUNNING</span></td>
+            <td class="p-3 text-right"><button class="text-red-400 hover:underline">Terminate</button></td>
+          </tr>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>
