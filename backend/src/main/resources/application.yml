@@ -22,12 +22,19 @@ spring:
         options:
           model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
   r2dbc:
-    url: r2dbc:h2:mem:///fabric;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
+    url: ${SPRING_R2DBC_URL:r2dbc:h2:mem:///fabric;DB_CLOSE_DELAY=-1}
+    username: ${SPRING_R2DBC_USERNAME:sa}
+    password: ${SPRING_R2DBC_PASSWORD:}
   sql:
     init:
-      mode: always
+      mode: never
+  flyway:
+    enabled: true
+    url: ${SPRING_FLYWAY_URL:jdbc:h2:mem:fabric;DB_CLOSE_DELAY=-1}
+    user: ${SPRING_FLYWAY_USER:sa}
+    password: ${SPRING_FLYWAY_PASSWORD:}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 fabric:
   openapi-path: ${FABRIC_OPENAPI_PATH:../openapi.yml}

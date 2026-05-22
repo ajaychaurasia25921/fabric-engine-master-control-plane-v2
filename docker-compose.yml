@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fabric
+      POSTGRES_USER: fabric
+      POSTGRES_PASSWORD: fabric
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fabric -d fabric"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -20,9 +36,17 @@ services:
       OLLAMA_CHAT_MODEL: llama3.2:3b
       OLLAMA_EMBEDDING_MODEL: nomic-embed-text
       FABRIC_OPENAPI_PATH: /app/openapi.yml
+      SPRING_R2DBC_URL: r2dbc:postgresql://postgres:5432/fabric
+      SPRING_R2DBC_USERNAME: fabric
+      SPRING_R2DBC_PASSWORD: fabric
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/fabric
+      SPRING_FLYWAY_USER: fabric
+      SPRING_FLYWAY_PASSWORD: fabric
     ports:
       - "8080:8080"
     depends_on:
+      postgres:
+        condition: service_healthy
       ollama:
         condition: service_healthy
 
@@ -39,3 +63,4 @@ services:
 
 volumes:
   ollama-data:
+  postgres-data:

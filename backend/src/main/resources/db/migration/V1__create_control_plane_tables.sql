@@ -7,3 +7,9 @@ CREATE TABLE IF NOT EXISTS sms_dispatches (
     gateway_status VARCHAR(24) NOT NULL,
     submitted_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_sms_dispatches_submitted_at
+    ON sms_dispatches (submitted_at);
+
+CREATE INDEX IF NOT EXISTS idx_sms_dispatches_gateway_status
+    ON sms_dispatches (gateway_status);

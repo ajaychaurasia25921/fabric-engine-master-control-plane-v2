@@ -30,10 +30,12 @@ docker compose up --build
 Services:
 
 - `ollama` on `11434`
+- `postgres` on `5432`
 - `backend` on `8080`
 - `frontend` on `5173`
 
 Spring AI auto-pulls `llama3.2:3b` and `nomic-embed-text` when missing. Override with `OLLAMA_CHAT_MODEL` and `OLLAMA_EMBEDDING_MODEL`.
+Database schema is created at backend startup by Flyway migrations in `backend/src/main/resources/db/migration`. Docker Compose uses Postgres with R2DBC for app access and JDBC/Flyway for migrations.
 
 ## Backend
 

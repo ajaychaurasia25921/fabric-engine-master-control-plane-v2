@@ -26,9 +26,13 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-vector-store'
     implementation "org.graalvm.polyglot:polyglot:${graalvmPolyglotVersion}"
     implementation "org.graalvm.polyglot:js:${graalvmPolyglotVersion}"
+    implementation 'org.flywaydb:flyway-core'
 
     runtimeOnly 'io.r2dbc:r2dbc-h2'
     runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'org.postgresql:r2dbc-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.projectreactor:reactor-test'
