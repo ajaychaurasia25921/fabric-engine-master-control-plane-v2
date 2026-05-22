@@ -30,7 +30,8 @@ const tabs = [
   ['file-transport', 'File Transport Plane'],
   ['quantum', 'Quantum Core'],
   ['networking', 'L7 Sockets'],
-  ['polyglot-functions', 'Polyglot Functions']
+  ['polyglot-functions', 'Polyglot Functions'],
+  ['about', 'About Reactor']
 ];
 
 const tabCopy = {
@@ -43,7 +44,8 @@ const tabCopy = {
   'file-transport': ['Asynchronous Data Broker File Transport Plane', 'Attach network diagnostic packages directly to running clusters.'],
   quantum: ['Quantum Telemetry Core Grid Sandbox', 'Dispatch experimental algorithmic circuits to superconducting loops.'],
   networking: ['Polymorphic Layer 7 Emulation Socket Bindings', 'Manage API reverse-proxy hooks and transport dialect bindings.'],
-  'polyglot-functions': ['GraalVM Polyglot Function Factory', 'Generate platform functions and test metadata-only routing scripts.']
+  'polyglot-functions': ['GraalVM Polyglot Function Factory', 'Generate platform functions and test metadata-only routing scripts.'],
+  about: ['About Reactor', 'Why this control plane exists and how it helps operators move faster.']
 };
 
 const activeTab = ref('dashboard');
@@ -67,7 +69,7 @@ const deviceRegistration = ref(null);
 const aiGuideOpen = ref(true);
 const aiGuideInput = ref('How do I provision an AI VM and register it on the fabric?');
 const aiGuideMessages = ref([
-  { role: 'guide', text: 'Hi, I am your Fabric Companion. Ask me about provisioning, wiring, alerts, or node eligibility.' }
+  { role: 'guide', text: 'Hi, I am your Reactor Companion. Ask me about provisioning, wiring, alerts, or node eligibility.' }
 ]);
 const packetCanvasOpen = ref(false);
 const vdiOpen = ref(false);
@@ -477,7 +479,7 @@ function handleVdiCommand() {
         <div class="brand-block">
           <div class="brand-mark">FE</div>
           <div>
-            <h1>Fabric Engine</h1>
+            <h1>Reactor</h1>
             <p>v2.1.0 · MULTI-CLUSTER</p>
           </div>
         </div>
@@ -807,6 +809,38 @@ function handleVdiCommand() {
       <section v-if="activeTab === 'polyglot-functions'" class="tab-page">
         <PlatformFunctionsPanel />
       </section>
+
+      <section v-if="activeTab === 'about'" class="tab-page">
+        <section class="about-hero panel">
+          <div>
+            <span class="status-chip green">Reactor</span>
+            <h3>One control plane for real infrastructure, packet truth, and guided operations.</h3>
+            <p>
+              Reactor exists to make complex infrastructure feel operable from one place: provision VMs,
+              register devices by MAC identity, model network paths, trace immutable encrypted packet metadata,
+              and react to anomalies with local AI guidance.
+            </p>
+          </div>
+        </section>
+        <section class="about-grid">
+          <article class="panel">
+            <h3>Why Reactor</h3>
+            <p class="muted">Infrastructure work usually scatters across hypervisors, shells, scripts, dashboards, packet tools, and alert consoles. Reactor pulls those loops into a single reactive workspace so teams can see what is connected, what changed, and what action is safe next.</p>
+          </article>
+          <article class="panel">
+            <h3>How It Helps</h3>
+            <p class="muted">It gives operators a Packet Tracer-style canvas, server and AI VM provisioning, quantum VM simulation, file movement between nodes, SMS alert dispatch, VDI access, hardware 360 monitoring, and a conversational guide that explains decisions in plain language.</p>
+          </article>
+          <article class="panel">
+            <h3>Operating Model</h3>
+            <p class="muted">Devices can keep an internet IP while joining the Reactor fabric with a second fabric IP. MAC registration anchors identity, while eligibility scripts decide whether a remote node can become a server host.</p>
+          </article>
+          <article class="panel">
+            <h3>AI Philosophy</h3>
+            <p class="muted">Reactor favors local Ollama-backed AI and deterministic fallbacks, so suggestions stay useful even when model calls are slow. The guide is here to reduce friction, not hide the underlying infrastructure.</p>
+          </article>
+        </section>
+      </section>
     </section>
 
     <div v-if="packetCanvasOpen" class="modal-backdrop">
@@ -859,7 +893,7 @@ function handleVdiCommand() {
       <button class="guide-avatar" @click="aiGuideOpen = !aiGuideOpen">AI</button>
       <div v-if="aiGuideOpen" class="guide-panel">
         <header>
-          <strong>Fabric Companion</strong>
+          <strong>Reactor Companion</strong>
           <span>talking NLP guide</span>
         </header>
         <div class="guide-messages">

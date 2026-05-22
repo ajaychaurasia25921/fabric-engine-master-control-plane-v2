@@ -158,7 +158,7 @@ function onEdgeClick({ edge }) {
   <section :class="['canvas-shell', { designer: isDesigner }]">
     <div class="canvas-toolbar">
       <div>
-        <h1>{{ isDesigner ? 'Packet Canvas Designer' : 'Fabric Engine Master Control Plane' }}</h1>
+        <h1>{{ isDesigner ? 'Packet Canvas Designer' : 'Reactor Master Control Plane' }}</h1>
         <p>{{ store.streamError || (isDesigner ? 'Device palette, wire palette, and immutable metadata inspection' : 'Static fabric topology with click-to-inspect metadata') }}</p>
       </div>
       <span :class="['stream-pill', { live: store.connected }]">

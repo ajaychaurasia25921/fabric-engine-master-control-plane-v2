@@ -690,6 +690,42 @@ textarea {
   margin: 0;
 }
 
+.about-hero {
+  min-height: 260px;
+  display: grid;
+  align-items: end;
+  background:
+    linear-gradient(135deg, rgba(20, 184, 166, 0.22), transparent 42%),
+    linear-gradient(315deg, rgba(59, 130, 246, 0.18), transparent 44%),
+    #111827;
+}
+
+.about-hero h3 {
+  max-width: 860px;
+  margin-top: 14px;
+  color: #f8fafc;
+  font-size: 34px;
+  line-height: 1.12;
+}
+
+.about-hero p {
+  max-width: 840px;
+  margin: 14px 0 0;
+  color: #cbd5e1;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.about-grid .panel {
+  min-height: 170px;
+}
+
 .endpoint-line {
   display: flex;
   align-items: center;
