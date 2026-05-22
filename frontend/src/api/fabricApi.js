@@ -118,6 +118,24 @@ export async function spawnSocket(payload) {
   return parseJson(response, 'Socket listener spawn failed');
 }
 
+export async function createPolyglotFunctionBlueprint(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/platform/functions/blueprints`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Polyglot function blueprint generation failed');
+}
+
+export async function evaluatePolyglotScript(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/platform/polyglot/scripts/evaluate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Polyglot script evaluation failed');
+}
+
 export function openFabricStream(onEvent) {
   const source = new EventSource(`${API_BASE}/api/v1/fabric/stream`);
   const parse = (message) => onEvent(JSON.parse(message.data));

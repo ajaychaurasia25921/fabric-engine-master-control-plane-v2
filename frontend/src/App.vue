@@ -14,6 +14,7 @@ import {
   tracePacket
 } from './api/fabricApi';
 import FabricCanvas from './components/FabricCanvas.vue';
+import PlatformFunctionsPanel from './components/PlatformFunctionsPanel.vue';
 import SmsDispatchPanel from './components/SmsDispatchPanel.vue';
 
 const tabs = [
@@ -25,7 +26,8 @@ const tabs = [
   ['packet-tracing', 'CCNP Packet Tracing'],
   ['file-transport', 'File Transport Plane'],
   ['quantum', 'Quantum Core'],
-  ['networking', 'L7 Sockets']
+  ['networking', 'L7 Sockets'],
+  ['polyglot-functions', 'Polyglot Functions']
 ];
 
 const tabCopy = {
@@ -37,7 +39,8 @@ const tabCopy = {
   'packet-tracing': ['CCNP Enterprise Multi-Hop Packet Inspection Tracing System', 'Simulate routing paths, encapsulation tags, and frame headers.'],
   'file-transport': ['Asynchronous Data Broker File Transport Plane', 'Attach network diagnostic packages directly to running clusters.'],
   quantum: ['Quantum Telemetry Core Grid Sandbox', 'Dispatch experimental algorithmic circuits to superconducting loops.'],
-  networking: ['Polymorphic Layer 7 Emulation Socket Bindings', 'Manage API reverse-proxy hooks and transport dialect bindings.']
+  networking: ['Polymorphic Layer 7 Emulation Socket Bindings', 'Manage API reverse-proxy hooks and transport dialect bindings.'],
+  'polyglot-functions': ['GraalVM Polyglot Function Factory', 'Generate platform functions and test metadata-only routing scripts.']
 };
 
 const activeTab = ref('dashboard');
@@ -403,6 +406,10 @@ async function submitSocket() {
           </form>
         </section>
         <pre class="console-frame">{{ socketOutput || 'Socket interface idle.' }}</pre>
+      </section>
+
+      <section v-if="activeTab === 'polyglot-functions'" class="tab-page">
+        <PlatformFunctionsPanel />
       </section>
     </section>
 
