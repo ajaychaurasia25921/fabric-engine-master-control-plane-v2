@@ -2,6 +2,7 @@ package com.acme.fabric.domain;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -136,6 +137,42 @@ public final class FabricModels {
     }
 
     public record ScrambleExecutionSummary(String randomizationLoopStatus, int affectedInterfacesCount) {
+    }
+
+    public record PolyglotFunctionBlueprintRequest(
+            @NotBlank String targetPlatform,
+            @NotBlank String functionName,
+            @NotBlank String language,
+            @NotBlank String handlerSource,
+            Map<String, Object> environment
+    ) {
+    }
+
+    public record GeneratedSourceFile(String path, String content) {
+    }
+
+    public record PolyglotFunctionBlueprintResponse(
+            String artifactId,
+            String targetPlatform,
+            String runtime,
+            List<GeneratedSourceFile> files,
+            List<String> deploymentHints
+    ) {
+    }
+
+    public record PolyglotScriptRequest(
+            @NotBlank String language,
+            @NotBlank String source,
+            Map<String, Object> bindings
+    ) {
+    }
+
+    public record PolyglotScriptResponse(
+            String executionId,
+            String language,
+            Object result,
+            Instant executedAt
+    ) {
     }
 
     public enum NodeRole {

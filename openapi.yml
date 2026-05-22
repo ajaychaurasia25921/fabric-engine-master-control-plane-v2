@@ -48,6 +48,8 @@ tags:
     description: Native gate-array depth circuit executions on physical superconducting QPUs or tensor-network mathematical simulators.
   - name: Reactive Fabric
     description: Fabric topology, node event intake, and server-sent remediation telemetry streams.
+  - name: Platform Function Factory
+    description: GraalVM polyglot code generation for serverless and platform script execution.
 
 paths:
   # ==========================================
@@ -809,6 +811,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/FabricEvent'
 
+  /platform/functions/blueprints:
+    post:
+      tags:
+        - Platform Function Factory
+      summary: Generate AWS Lambda or Azure Functions code using GraalVM polyglot wrappers.
+      operationId: createPolyglotFunctionBlueprint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolyglotFunctionBlueprintRequest'
+      responses:
+        '200':
+          description: Generated source files and deployment hints.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolyglotFunctionBlueprintResponse'
+
+  /platform/polyglot/scripts/evaluate:
+    post:
+      tags:
+        - Platform Function Factory
+      summary: Evaluate a constrained GraalVM polyglot script with supplied bindings.
+      operationId: evaluatePolyglotScript
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolyglotScriptRequest'
+      responses:
+        '200':
+          description: Script execution result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolyglotScriptResponse'
+
 components:
   schemas:
     # --- Compute Core Objects ---
@@ -1452,5 +1494,99 @@ components:
         recommendation:
           type: string
         occurredAt:
+          type: string
+          format: date-time
+
+    PolyglotFunctionBlueprintRequest:
+      type: object
+      required:
+        - targetPlatform
+        - functionName
+        - language
+        - handlerSource
+      properties:
+        targetPlatform:
+          type: string
+          enum: [AWS_LAMBDA, AZURE_FUNCTIONS]
+        functionName:
+          type: string
+          example: "packet-risk-router"
+        language:
+          type: string
+          enum: [js, javascript]
+        handlerSource:
+          type: string
+          description: GraalVM guest-language script source. The event/body is available as `input`.
+          example: "JSON.stringify({ route: input.destinationIpNode || 'unknown' })"
+        environment:
+          type: object
+          additionalProperties: true
+
+    GeneratedSourceFile:
+      type: object
+      required:
+        - path
+        - content
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+
+    PolyglotFunctionBlueprintResponse:
+      type: object
+      required:
+        - artifactId
+        - targetPlatform
+        - runtime
+        - files
+        - deploymentHints
+      properties:
+        artifactId:
+          type: string
+        targetPlatform:
+          type: string
+        runtime:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeneratedSourceFile'
+        deploymentHints:
+          type: array
+          items:
+            type: string
+
+    PolyglotScriptRequest:
+      type: object
+      required:
+        - language
+        - source
+      properties:
+        language:
+          type: string
+          enum: [js, javascript]
+        source:
+          type: string
+          example: "({ score: input.severity === 'CRITICAL' ? 100 : 10 })"
+        bindings:
+          type: object
+          additionalProperties: true
+
+    PolyglotScriptResponse:
+      type: object
+      required:
+        - executionId
+        - language
+        - executedAt
+      properties:
+        executionId:
+          type: string
+          format: uuid
+        language:
+          type: string
+        result:
+          nullable: true
+        executedAt:
           type: string
           format: date-time

@@ -6,6 +6,7 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 
 import com.acme.fabric.handler.FabricHandler;
 import com.acme.fabric.handler.ControlPlaneHandler;
+import com.acme.fabric.handler.PlatformFunctionHandler;
 import com.acme.fabric.handler.SmsDispatchHandler;
 
 import org.springframework.context.annotation.Bean;
@@ -17,7 +18,8 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 public class FabricRouter {
     @Bean
     RouterFunction<ServerResponse> routes(FabricHandler fabricHandler, SmsDispatchHandler smsDispatchHandler,
-                                          ControlPlaneHandler controlPlaneHandler) {
+                                          ControlPlaneHandler controlPlaneHandler,
+                                          PlatformFunctionHandler platformFunctionHandler) {
         return route(GET("/api/v1/fabric/topology"), fabricHandler::topology)
                 .andRoute(POST("/api/v1/fabric/events"), fabricHandler::publishEvent)
                 .andRoute(GET("/api/v1/fabric/stream"), fabricHandler::stream)
@@ -34,6 +36,8 @@ public class FabricRouter {
                 .andRoute(POST("/api/v1/networking/telnet/command"), controlPlaneHandler::terminalCommand)
                 .andRoute(POST("/api/v1/quantum/circuits/executions"), controlPlaneHandler::executeQuantumCircuit)
                 .andRoute(POST("/api/v1/networking/socket-listeners"), controlPlaneHandler::spawnSocket)
-                .andRoute(POST("/api/v1/network/identity/scramble"), controlPlaneHandler::scrambleIdentity);
+                .andRoute(POST("/api/v1/network/identity/scramble"), controlPlaneHandler::scrambleIdentity)
+                .andRoute(POST("/api/v1/platform/functions/blueprints"), platformFunctionHandler::createBlueprint)
+                .andRoute(POST("/api/v1/platform/polyglot/scripts/evaluate"), platformFunctionHandler::evaluateScript);
     }
 }

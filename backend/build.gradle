@@ -7,6 +7,10 @@ plugins {
 group = 'com.acme.fabric'
 version = '2.0.0'
 
+ext {
+    graalvmPolyglotVersion = '25.0.3'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -20,6 +24,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
     implementation 'org.springframework.ai:spring-ai-vector-store'
+    implementation "org.graalvm.polyglot:polyglot:${graalvmPolyglotVersion}"
+    implementation "org.graalvm.polyglot:js:${graalvmPolyglotVersion}"
 
     runtimeOnly 'io.r2dbc:r2dbc-h2'
     runtimeOnly 'com.h2database:h2'

@@ -6,6 +6,7 @@ Reactive control-plane baseline for network fabric operations, aligned to the pr
 - Spring AI `FabricAgent` using local Ollama chat and embeddings. It ingests `openapi.yml` into a `VectorStore` and reacts to anomalies from a `Flux` event stream.
 - R2DBC-backed SMS dispatch persistence to keep database operations off the event loop.
 - Vue 3 Composition API frontend with VueFlow packet canvas, Pinia fabric state, SSE updates, and an SMS dispatch side panel.
+- GraalVM polyglot function factory for generating AWS Lambda or Azure Functions Java wrappers that execute `function.js` through GraalJS.
 
 ## API
 
@@ -17,6 +18,8 @@ Implemented endpoints:
 - `POST /api/v1/fabric/events`
 - `GET /api/v1/fabric/stream`
 - `POST /sms/dispatches`
+- `POST /api/v1/platform/functions/blueprints`
+- `POST /api/v1/platform/polyglot/scripts/evaluate`
 
 ## Docker Compose
 
@@ -60,3 +63,5 @@ Use `VITE_API_BASE=http://localhost:8080` if the backend runs somewhere else.
 ## Notes
 
 Spring AI `1.1.6` is used through the official BOM with `spring-ai-starter-model-ollama`. No cloud AI provider or API key is required.
+
+GraalVM polyglot support uses `org.graalvm.polyglot:polyglot` and `org.graalvm.polyglot:js`. The runtime evaluator disables host IO, process creation, thread creation, and environment access; generated AWS/Azure blueprints are source artifacts for your deployment pipeline rather than automatic cloud deploys.
