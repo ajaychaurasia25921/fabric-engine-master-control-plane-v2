@@ -4,9 +4,9 @@ import { getSmsGatewayStatus } from '../api/fabricApi';
 import { useFabricStore } from '../stores/fabricStore';
 
 const providerToProtocol = {
-  TWILIO_REST: 'REST_FORWARD',
-  AWS_SNS_SMS: 'REST_FORWARD',
-  INFOBIP_CORE: 'SMPP_V34'
+  LOCAL_SMPP_TRUNK: 'SMPP_V34',
+  GSM_MODEM_AT: 'GSM_AT_COMMANDS',
+  INTERNAL_REST_FORWARD: 'REST_FORWARD'
 };
 
 const store = useFabricStore();
@@ -15,10 +15,10 @@ const error = ref('');
 const gateway = ref(null);
 const logs = ref([
   '[00:00:01] System localized message broker pipeline initialized successfully.',
-  '[00:05:12] Heartbeat check on provider endpoint (TWILIO_REST) -> 200 OK.'
+  '[00:05:12] Heartbeat check on local carrier endpoint (LOCAL_SMPP_TRUNK) -> 200 OK.'
 ]);
 const form = reactive({
-  provider: 'TWILIO_REST',
+  provider: 'LOCAL_SMPP_TRUNK',
   recipient: '+1 (555) 019-2834',
   senderId: 'FABRIC_ENG',
   message: 'CRITICAL_ALERT: Hypervisor core node cluster [prod-zone-edge] triggered microcode validation failure. Action required.',
@@ -86,9 +86,9 @@ async function submit() {
         <label>
           Upstream Provider Routing API
           <select v-model="form.provider">
-            <option value="TWILIO_REST">Twilio Distributed Messaging Node</option>
-            <option value="AWS_SNS_SMS">Amazon Web Services SNS Gateway</option>
-            <option value="INFOBIP_CORE">Infobip Global Telco Ingestion</option>
+            <option value="LOCAL_SMPP_TRUNK">Local Carrier SMPP Trunk</option>
+            <option value="GSM_MODEM_AT">On-Prem GSM Modem AT Commands</option>
+            <option value="INTERNAL_REST_FORWARD">Internal REST Forwarder</option>
           </select>
         </label>
 
