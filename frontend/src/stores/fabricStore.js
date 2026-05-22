@@ -3,17 +3,21 @@ import { defineStore } from 'pinia';
 import { dispatchSms, fetchTopology, openFabricStream } from '../api/fabricApi';
 
 const statusColors = {
-  healthy: '#16805d',
-  degraded: '#b7791f',
-  down: '#c7362f',
-  remediating: '#2563eb'
+  RUNNING: '#3b82f6',
+  PROVISIONED: '#64748b',
+  INITIALIZING: '#f59e0b',
+  DEGRADED: '#f97316',
+  DOWN: '#ef4444',
+  REMEDIATING: '#8b5cf6'
 };
 
 const statusBackgrounds = {
-  healthy: '#f7fffb',
-  degraded: '#fff8eb',
-  down: '#fff1f0',
-  remediating: '#eff6ff'
+  RUNNING: '#111827',
+  PROVISIONED: '#0f172a',
+  INITIALIZING: '#1f1a0b',
+  DEGRADED: '#25140b',
+  DOWN: '#2a0f12',
+  REMEDIATING: '#17132f'
 };
 
 export const useFabricStore = defineStore('fabric', () => {
@@ -34,11 +38,11 @@ export const useFabricStore = defineStore('fabric', () => {
     style: {
       border: `2px solid ${statusColors[node.status] ?? '#667085'}`,
       background: statusBackgrounds[node.status] ?? '#ffffff',
-      color: '#111827',
+      color: '#f8fafc',
       borderRadius: '8px',
       minWidth: '150px',
       fontWeight: 800,
-      boxShadow: node.status === 'down' ? '0 10px 22px rgba(199, 54, 47, 0.16)' : '0 8px 16px rgba(17, 24, 39, 0.08)'
+      boxShadow: node.status === 'DOWN' ? '0 10px 22px rgba(239, 68, 68, 0.28)' : '0 8px 18px rgba(0, 0, 0, 0.24)'
     }
   })));
 
@@ -48,8 +52,8 @@ export const useFabricStore = defineStore('fabric', () => {
     target: edge.target,
     label: edge.label,
     animated: true,
-    style: { stroke: '#607d8b', strokeWidth: 2 },
-    labelStyle: { fontWeight: 700, fill: '#344054' }
+    style: { stroke: '#64748b', strokeWidth: 2 },
+    labelStyle: { fontWeight: 700, fill: '#cbd5e1' }
   })));
 
   async function loadTopology() {

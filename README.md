@@ -1,9 +1,9 @@
 # Fabric Engine Master Control Plane v2
 
-Reactive control-plane baseline for network fabric operations:
+Reactive control-plane baseline for network fabric operations, aligned to the provided `openapi.yml`, `index3-full-final.html`, and the SMS-only flow from `index-sms-final.html`.
 
 - Spring WebFlux functional routes for fabric topology, event ingestion, SSE streaming, and SMS dispatch.
-- Spring AI `FabricAgent` that ingests `openapi.yml` into a `VectorStore` when configured and reacts to anomalies from a `Flux` event stream.
+- Spring AI `FabricAgent` using local Ollama chat and embeddings. It ingests `openapi.yml` into a `VectorStore` and reacts to anomalies from a `Flux` event stream.
 - R2DBC-backed SMS dispatch persistence to keep database operations off the event loop.
 - Vue 3 Composition API frontend with VueFlow packet canvas, Pinia fabric state, SSE updates, and an SMS dispatch side panel.
 
@@ -18,11 +18,25 @@ Implemented endpoints:
 - `GET /api/v1/fabric/stream`
 - `POST /sms/dispatches`
 
+## Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- `ollama` on `11434`
+- `backend` on `8080`
+- `frontend` on `5173`
+
+Spring AI auto-pulls `llama3.2:3b` and `nomic-embed-text` when missing. Override with `OLLAMA_CHAT_MODEL` and `OLLAMA_EMBEDDING_MODEL`.
+
 ## Backend
 
 ```bash
 cd backend
-mvn spring-boot:run
+gradle bootRun
 ```
 
 The demo telemetry simulator publishes node events every 8 seconds. Disable it with:
@@ -45,4 +59,4 @@ Use `VITE_API_BASE=http://localhost:8080` if the backend runs somewhere else.
 
 ## Notes
 
-Spring AI `1.1.6` is used through the official BOM. If a `VectorStore` or `ChatClient.Builder` bean is configured by adding provider-specific starters, `FabricAgent` will use it. Without model credentials, the agent falls back to deterministic rule-based remediation plans while preserving the same reactive flow.
+Spring AI `1.1.6` is used through the official BOM with `spring-ai-starter-model-ollama`. No cloud AI provider or API key is required.

@@ -30,7 +30,7 @@ spring:
       mode: always
 
 fabric:
-  openapi-path: ../openapi.yml
+  openapi-path: ${FABRIC_OPENAPI_PATH:../openapi.yml}
   telemetry:
     demo-events-enabled: true
   smpp:

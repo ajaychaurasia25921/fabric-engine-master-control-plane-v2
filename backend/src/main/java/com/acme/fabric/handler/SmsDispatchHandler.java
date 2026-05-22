@@ -2,6 +2,7 @@ package com.acme.fabric.handler;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
+import com.acme.fabric.domain.FabricModels.SmsGatewayMetrics;
 import com.acme.fabric.domain.FabricModels.SmsDispatchPayload;
 import com.acme.fabric.sms.SmsDispatchService;
 
@@ -28,6 +29,12 @@ public class SmsDispatchHandler {
                 .flatMap(response -> ServerResponse.accepted()
                         .contentType(APPLICATION_JSON)
                         .bodyValue(response));
+    }
+
+    public Mono<ServerResponse> status(ServerRequest request) {
+        return ServerResponse.ok()
+                .contentType(APPLICATION_JSON)
+                .bodyValue(new SmsGatewayMetrics("smsc.carrier-edge.internal", 4, -68));
     }
 
     private Mono<SmsDispatchPayload> validate(SmsDispatchPayload request) {

@@ -1,33 +1,70 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { getSmsGatewayStatus } from '../api/fabricApi';
 import { useFabricStore } from '../stores/fabricStore';
+
+const providerToProtocol = {
+  TWILIO_REST: 'REST_FORWARD',
+  AWS_SNS_SMS: 'REST_FORWARD',
+  INFOBIP_CORE: 'SMPP_V34'
+};
 
 const store = useFabricStore();
 const busy = ref(false);
 const error = ref('');
+const gateway = ref(null);
+const logs = ref([
+  '[00:00:01] System localized message broker pipeline initialized successfully.',
+  '[00:05:12] Heartbeat check on provider endpoint (TWILIO_REST) -> 200 OK.'
+]);
 const form = reactive({
-  recipient: '+15551234567',
-  severity: 'CRITICAL',
-  correlationId: '',
-  message: 'Fabric anomaly detected. Ollama remediation has started.'
+  provider: 'TWILIO_REST',
+  recipient: '+1 (555) 019-2834',
+  senderId: 'FABRIC_ENG',
+  message: 'CRITICAL_ALERT: Hypervisor core node cluster [prod-zone-edge] triggered microcode validation failure. Action required.',
+  webhookUrl: 'https://api.internal.security.monitor/webhooks/sms-receipt'
 });
 
 const latestCritical = computed(() => store.events.find((event) => event.severity === 'CRITICAL'));
 
+onMounted(async () => {
+  try {
+    gateway.value = await getSmsGatewayStatus();
+  } catch {
+    gateway.value = null;
+  }
+});
+
+function stamp() {
+  return new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+
 function useLatestCritical() {
   if (!latestCritical.value) return;
-  form.correlationId = latestCritical.value.id;
-  form.message = `${latestCritical.value.nodeId}: ${latestCritical.value.message}`;
-  form.severity = latestCritical.value.severity;
+  form.message = `${latestCritical.value.severity}_ALERT: ${latestCritical.value.nodeId} ${latestCritical.value.message}`;
+}
+
+function bindWebhook() {
+  logs.value = [`[${stamp()}] [WEBHOOK_BIND] Receipt callback bound -> ${form.webhookUrl}`, ...logs.value];
 }
 
 async function submit() {
   busy.value = true;
   error.value = '';
   try {
-    await store.submitSms({ ...form });
+    const response = await store.submitSms({
+      targetMobileEndpoint: form.recipient,
+      smsMessageText: `[${form.senderId}] ${form.message}`.slice(0, 160),
+      signalingProtocol: providerToProtocol[form.provider]
+    });
+    logs.value = [
+      `[${stamp()}] [DISPATCH] Provider: ${form.provider} -> Recipient: ${form.recipient} -> STATUS: ${response.gatewayStatus}`,
+      `[${stamp()}] [TRACKING] smsTrackingId=${response.smsTrackingId}`,
+      ...logs.value
+    ];
   } catch (err) {
     error.value = err.message;
+    logs.value = [`[${stamp()}] [ERROR] ${err.message}`, ...logs.value];
   } finally {
     busy.value = false;
   }
@@ -35,59 +72,83 @@ async function submit() {
 </script>
 
 <template>
-  <aside class="side-panel">
-    <form class="sms-form" @submit.prevent="submit">
-      <header class="panel-header">
-        <h2>SMS Dispatch</h2>
-        <button type="button" class="ghost-button" @click="useLatestCritical">Use latest critical</button>
-      </header>
+  <div class="sms-grid">
+    <section class="panel space-y">
+      <div>
+        <div class="panel-title-row">
+          <h3>SMS Dispatch Terminal</h3>
+          <span class="status-chip blue">Acknowledge Ready</span>
+        </div>
+        <p class="muted">Broadcast high-priority critical warning anomalies or system auth strings.</p>
+      </div>
 
-      <label>
-        Recipient
-        <input v-model="form.recipient" type="tel" autocomplete="tel" required />
-      </label>
+      <form class="form-grid" @submit.prevent="submit">
+        <label>
+          Upstream Provider Routing API
+          <select v-model="form.provider">
+            <option value="TWILIO_REST">Twilio Distributed Messaging Node</option>
+            <option value="AWS_SNS_SMS">Amazon Web Services SNS Gateway</option>
+            <option value="INFOBIP_CORE">Infobip Global Telco Ingestion</option>
+          </select>
+        </label>
 
-      <label>
-        Severity
-        <select v-model="form.severity">
-          <option>INFO</option>
-          <option>WARNING</option>
-          <option>CRITICAL</option>
-        </select>
-      </label>
+        <label>
+          Destination Mobile MSISDN
+          <input v-model="form.recipient" required />
+        </label>
 
-      <label>
-        Correlation ID
-        <input v-model="form.correlationId" placeholder="event or incident id" />
-      </label>
+        <label>
+          Alphanumeric Sender ID Mask
+          <input v-model="form.senderId" />
+        </label>
 
-      <label>
-        Message
-        <textarea v-model="form.message" maxlength="480" rows="5" required />
-      </label>
+        <label>
+          SMS Payload Content Stream
+          <textarea v-model="form.message" maxlength="160" rows="4" required />
+        </label>
 
-      <button class="primary-button" type="submit" :disabled="busy">
-        {{ busy ? 'Dispatching...' : 'Dispatch Alert' }}
-      </button>
-      <p v-if="error" class="form-error">{{ error }}</p>
-    </form>
-
-    <section class="event-list">
-      <h2>Recent Fabric Events</h2>
-      <article v-for="event in store.events" :key="event.id" class="event-row">
-        <strong>{{ event.nodeId }}</strong>
-        <span>{{ event.severity }} · {{ event.type }}</span>
-        <p>{{ event.message }}</p>
-        <small v-if="event.recommendation">{{ event.recommendation }}</small>
-      </article>
+        <div class="button-row">
+          <button class="secondary-button" type="button" @click="useLatestCritical">Use latest critical</button>
+          <button class="primary-button" type="submit" :disabled="busy">
+            {{ busy ? 'Dispatching...' : 'Dispatch SMS Pipeline' }}
+          </button>
+        </div>
+        <p v-if="error" class="form-error">{{ error }}</p>
+      </form>
     </section>
 
-    <section class="event-list">
-      <h2>SMS Dispatches</h2>
-      <article v-for="dispatch in store.dispatches" :key="dispatch.id" class="event-row">
-        <strong>{{ dispatch.status }}</strong>
-        <span>{{ dispatch.providerMessageId }}</span>
-      </article>
+    <section class="panel sms-logs">
+      <div class="panel-title-row">
+        <h4>Webhook Callback Matrix</h4>
+        <span class="status-chip green">Active Listening</span>
+      </div>
+
+      <div class="webhook-row">
+        <label>
+          Target Endpoint URL Destination
+          <input v-model="form.webhookUrl" type="url" />
+        </label>
+        <button class="secondary-button" type="button" @click="bindWebhook">Bind Webhook</button>
+      </div>
+
+      <div v-if="gateway" class="metric-strip">
+        <span>SMSC {{ gateway.connectedSmsC }}</span>
+        <span>{{ gateway.activeModemPorts }} modem ports</span>
+        <span>{{ gateway.signalStrengthDbm }} dBm</span>
+      </div>
+
+      <h4>Live Transmission Loop Realtime Audit Logs</h4>
+      <div class="log-frame">
+        <p v-for="line in logs" :key="line">{{ line }}</p>
+      </div>
+
+      <h4>SMS Dispatches</h4>
+      <div class="event-stack">
+        <article v-for="dispatch in store.dispatches" :key="dispatch.smsTrackingId" class="event-row">
+          <strong>{{ dispatch.gatewayStatus }}</strong>
+          <span>{{ dispatch.smsTrackingId }}</span>
+        </article>
+      </div>
     </section>
-  </aside>
+  </div>
 </template>
