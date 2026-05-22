@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,8 @@ import com.acme.fabric.stream.FabricEventBus;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -32,6 +35,9 @@ import reactor.core.scheduler.Schedulers;
 
 @Service
 public class FabricAgent {
+    private static final Logger log = LoggerFactory.getLogger(FabricAgent.class);
+    private static final int RAG_CHUNK_SIZE = 3_000;
+
     private final FabricEventBus eventBus;
     private final Optional<VectorStore> vectorStore;
     private final Optional<ChatClient> chatClient;
@@ -56,8 +62,9 @@ public class FabricAgent {
                 .then(Mono.fromRunnable(() -> subscription = eventBus.events()
                         .filter(this::isAnomaly)
                         .flatMap(this::remediate)
-                        .subscribe(eventBus::publish)))
-                .subscribe();
+                        .onErrorContinue((error, event) -> log.warn("Remediation stream skipped event {}: {}", event, error.getMessage()))
+                        .subscribe(eventBus::publish, error -> log.warn("Remediation stream stopped: {}", error.getMessage()))))
+                .subscribe(null, error -> log.warn("Fabric agent startup skipped: {}", error.getMessage()));
     }
 
     @PreDestroy
@@ -79,7 +86,20 @@ public class FabricAgent {
                         "Autonomous remediation started for " + anomaly.nodeId(),
                         plan,
                         Instant.now()
-                ));
+                ))
+                .onErrorResume(error -> {
+                    log.warn("Using rule-based remediation for {}: {}", anomaly.nodeId(), error.getMessage());
+                    return Mono.just(new FabricEvent(
+                            UUID.randomUUID().toString(),
+                            AI_REMEDIATION,
+                            INFO,
+                            anomaly.nodeId(),
+                            REMEDIATING,
+                            "Autonomous remediation started for " + anomaly.nodeId(),
+                            ruleBasedPlan(anomaly),
+                            Instant.now()
+                    ));
+                });
     }
 
     private Mono<Void> ingestOpenApiContext() {
@@ -90,9 +110,20 @@ public class FabricAgent {
                         ? Files.readString(openApiPath)
                         : "OpenAPI contract not found at " + openApiPath)
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(spec -> List.of(new Document(spec)))
+                .map(this::chunkOpenApiSpec)
                 .doOnNext(vectorStore.get()::add)
+                .doOnError(error -> log.warn("OpenAPI RAG ingestion skipped: {}", error.getMessage()))
+                .onErrorResume(error -> Mono.empty())
                 .then();
+    }
+
+    private List<Document> chunkOpenApiSpec(String spec) {
+        List<Document> documents = new ArrayList<>();
+        for (int start = 0; start < spec.length(); start += RAG_CHUNK_SIZE) {
+            int end = Math.min(start + RAG_CHUNK_SIZE, spec.length());
+            documents.add(new Document(spec.substring(start, end)));
+        }
+        return documents;
     }
 
     private Mono<String> generatePlan(FabricEvent anomaly) {
@@ -103,7 +134,11 @@ public class FabricAgent {
                         .call()
                         .content())
                         .subscribeOn(Schedulers.boundedElastic())
-                        .onErrorReturn(ruleBasedPlan(anomaly)))
+                        .timeout(Duration.ofSeconds(8))
+                        .onErrorResume(error -> {
+                            log.warn("Ollama remediation plan timed out or failed for {}: {}", anomaly.nodeId(), error.getMessage());
+                            return Mono.just(ruleBasedPlan(anomaly));
+                        }))
                 .orElseGet(() -> Mono.just(ruleBasedPlan(anomaly)));
     }
 
@@ -116,6 +151,7 @@ public class FabricAgent {
             case SECURITY_ALERT -> "Quarantine the segment, rotate policy, and increase telemetry sampling.";
             case NODE_STATUS -> "Drain traffic, validate BGP/EVPN adjacency, and restart the node fabric agent.";
             case AI_REMEDIATION -> "Continue observing remediation convergence.";
+            case PIPELINE_UPDATE -> "Verify the pipeline checkpoint, hold mutable actions, and continue packet trace telemetry.";
         };
     }
 }
