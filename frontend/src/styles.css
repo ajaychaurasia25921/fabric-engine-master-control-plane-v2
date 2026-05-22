@@ -314,7 +314,7 @@ textarea {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
 }
 
@@ -642,6 +642,52 @@ textarea {
   color: #cbd5e1;
   background: #030712;
   font-size: 11px;
+}
+
+.hardware-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hardware-grid article {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 14px;
+  background: #030712;
+}
+
+.hardware-grid span,
+.suggestion-list strong {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.hardware-grid strong {
+  color: #f8fafc;
+  font-size: 20px;
+}
+
+.hardware-grid small,
+.suggestion-list p {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.suggestion-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid #1f2937;
+  padding-top: 14px;
+}
+
+.suggestion-list p {
+  margin: 0;
 }
 
 .endpoint-line {
@@ -1068,6 +1114,104 @@ textarea {
   border: 0;
   padding: 0;
   background: transparent;
+}
+
+.ai-guide {
+  position: fixed;
+  right: 22px;
+  bottom: 20px;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: auto minmax(0, 360px);
+  gap: 10px;
+  align-items: end;
+}
+
+.ai-guide.collapsed {
+  grid-template-columns: auto;
+}
+
+.guide-avatar {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 2px solid rgba(20, 184, 166, 0.55);
+  border-radius: 50%;
+  color: #ccfbf1;
+  background: #0f766e;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+  font-weight: 900;
+}
+
+.guide-panel {
+  overflow: hidden;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.98);
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.38);
+}
+
+.guide-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #1f2937;
+  padding: 12px;
+}
+
+.guide-panel header span {
+  color: #14b8a6;
+  font-size: 11px;
+}
+
+.guide-messages {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.guide-messages article {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 9px;
+  background: #020617;
+}
+
+.guide-messages article.user {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(30, 64, 175, 0.25);
+}
+
+.guide-messages p {
+  margin: 0;
+  color: #e5e7eb;
+  font-size: 12px;
+}
+
+.guide-messages small {
+  display: block;
+  margin-top: 5px;
+  color: #94a3b8;
+}
+
+.guide-panel form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  border-top: 1px solid #1f2937;
+  padding: 10px;
+}
+
+.guide-panel form button {
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #2563eb;
+  font-weight: 900;
 }
 
 .form-error {

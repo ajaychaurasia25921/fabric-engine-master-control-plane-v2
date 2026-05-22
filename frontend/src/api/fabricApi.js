@@ -36,6 +36,29 @@ export async function provisionServer(payload) {
   return parseJson(response, 'Server provisioning failed');
 }
 
+export async function registerDevice(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/network/devices/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Device registration failed');
+}
+
+export async function fetchHardwareOverview() {
+  const response = await fetch(`${API_BASE}/api/v1/hardware/overview`);
+  return parseJson(response, 'Hardware overview unavailable');
+}
+
+export async function askAiGuide(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/ai-guide/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'AI guide unavailable');
+}
+
 export async function scrambleIdentity() {
   const response = await fetch(`${API_BASE}/api/v1/network/identity/scramble`, {
     method: 'POST',

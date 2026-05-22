@@ -19,9 +19,14 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.acme.fabric.domain.FabricModels.AllocationMetadata;
+import com.acme.fabric.domain.FabricModels.AiGuidePrompt;
+import com.acme.fabric.domain.FabricModels.AiGuideResponse;
 import com.acme.fabric.domain.FabricModels.ComputeJobStatus;
+import com.acme.fabric.domain.FabricModels.DeviceRegistrationRequest;
+import com.acme.fabric.domain.FabricModels.DeviceRegistrationResponse;
 import com.acme.fabric.domain.FabricModels.FabricEvent;
 import com.acme.fabric.domain.FabricModels.FirewallRuleEntity;
+import com.acme.fabric.domain.FabricModels.HardwareOverview;
 import com.acme.fabric.domain.FabricModels.HoneypotIncidentRecord;
 import com.acme.fabric.domain.FabricModels.IdentityScrambleIntent;
 import com.acme.fabric.domain.FabricModels.PacketTraceRequest;
@@ -67,7 +72,11 @@ public class ControlPlaneHandler {
         return request.bodyToMono(ServerProvisionIntent.class)
                 .map(intent -> {
                     String serverId = UUID.randomUUID().toString();
-                    String ip = "10.194." + (Math.abs(serverId.hashCode()) % 220 + 10) + "." + (Math.abs(intent.serverName().hashCode()) % 220 + 10);
+                    String ip = intent.fabricIpAddress() == null || intent.fabricIpAddress().isBlank()
+                            ? "10.194." + (Math.abs(serverId.hashCode()) % 220 + 10) + "." + (Math.abs(intent.serverName().hashCode()) % 220 + 10)
+                            : intent.fabricIpAddress();
+                    String placement = intent.placementMode() == null ? "PHYSICAL_HOST_VM" : intent.placementMode();
+                    List<String> nextActions = provisioningActions(intent, placement);
                     eventBus.publish(new FabricEvent(
                             UUID.randomUUID().toString(),
                             NODE_STATUS,
@@ -78,9 +87,57 @@ public class ControlPlaneHandler {
                             "Bootstrap allocation assigned to " + ip,
                             Instant.now()
                     ));
-                    return new ServerProvisionStatus(serverId, new AllocationMetadata(ip, Instant.now()), RuntimeState.INITIALIZING);
+                    return new ServerProvisionStatus(
+                            serverId,
+                            new AllocationMetadata(ip, intent.internetIpAddress(), intent.registeredMacAddress(), placement, Instant.now()),
+                            RuntimeState.INITIALIZING,
+                            nextActions
+                    );
                 })
                 .flatMap(status -> ServerResponse.status(CREATED).contentType(APPLICATION_JSON).bodyValue(status));
+    }
+
+    public Mono<ServerResponse> registerDevice(ServerRequest request) {
+        return request.bodyToMono(DeviceRegistrationRequest.class)
+                .map(payload -> new DeviceRegistrationResponse(
+                        "reg-" + UUID.randomUUID().toString().substring(0, 8),
+                        "DUAL_HOMED_REGISTERED",
+                        List.of(
+                                "MAC " + payload.macAddress() + " pinned to fabric identity",
+                                "Internet IP " + payload.internetIpAddress() + " retained for uplink",
+                                "Fabric IP " + payload.fabricIpAddress() + " assigned for control-plane traffic"
+                        )
+                ))
+                .flatMap(response -> ServerResponse.status(CREATED).contentType(APPLICATION_JSON).bodyValue(response));
+    }
+
+    public Mono<ServerResponse> hardwareOverview(ServerRequest request) {
+        HardwareOverview overview = new HardwareOverview(
+                "local-physical-host",
+                Map.of("cores", 8, "loadPercent", 42, "thermalState", "NOMINAL"),
+                Map.of("totalGb", 32, "usedGb", 18, "pressure", "LOW"),
+                Map.of("vmPoolGb", 512, "usedGb", 226, "iopsState", "HEALTHY"),
+                Map.of("fabricInterfaces", 2, "internetUplink", "ACTIVE", "fabricBridge", "ACTIVE"),
+                List.of(
+                        "Pin AI VMs to the host VM pool and reserve 6 GB memory per local model runtime.",
+                        "Quantum systems should stay VM-only and use simulated QPU acceleration until a hardware backend is registered.",
+                        "Remote node server promotion should run eligibility checks before installing hypervisor services."
+                ),
+                List.of("Ollama CPU inference can spike during remediation; keep rule-based fallback enabled.")
+        );
+        return ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(overview);
+    }
+
+    public Mono<ServerResponse> aiGuide(ServerRequest request) {
+        return request.bodyToMono(AiGuidePrompt.class)
+                .map(prompt -> new AiGuideResponse(
+                        "guide-" + UUID.randomUUID().toString().substring(0, 8),
+                        "Fabric Companion",
+                        "I can help wire devices, register MAC identities, decide whether to provision on the physical host or a remote node, and explain alerts. For this request: "
+                                + prompt.message(),
+                        List.of("Open Packet Canvas", "Review Hardware 360", "Run Node Eligibility Check")
+                ))
+                .flatMap(response -> ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(response));
     }
 
     public Mono<ServerResponse> firewallRules(ServerRequest request) {
@@ -195,5 +252,26 @@ public class ControlPlaneHandler {
                     + payload.protocolDialectMode();
             default -> "% Parsed command '" + payload.rawCommandText() + "' accepted by sandbox terminal loop";
         };
+    }
+
+    private List<String> provisioningActions(ServerProvisionIntent intent, String placement) {
+        if ("QUANTUM_VM".equals(intent.targetRoleClass())) {
+            return List.of(
+                    "Force deploymentFramework=VIRTUAL_MACHINE for quantum runtime isolation.",
+                    "Attach simulated QPU profile before exposing quantum circuit endpoint."
+            );
+        }
+        if ("REMOTE_NODE".equals(placement)) {
+            return List.of(
+                    "Run eligibility script on " + intent.parentNodeId(),
+                    "Verify CPU virtualization, memory pressure, disk pool, and dual-network reachability.",
+                    "If checks pass, run install script to promote node as server host; otherwise return remediation steps."
+            );
+        }
+        return List.of(
+                "Create VM on the physical system where Fabric Engine is running.",
+                "Attach internet uplink and fabric bridge for dual-IP control.",
+                "Register MAC identity and expose hardware telemetry in 360 view."
+        );
     }
 }

@@ -52,9 +52,16 @@ public final class FabricModels {
             @NotBlank String deploymentFramework,
             @NotBlank String executionScope,
             @NotBlank String targetRoleClass,
+            String placementMode,
+            String registeredMacAddress,
+            String internetIpAddress,
+            String fabricIpAddress,
             DbRoleConfig dbRoleConfig,
             AppRoleConfig appRoleConfig,
-            HoneypotConfig honeypotConfig
+            HoneypotConfig honeypotConfig,
+            AiVmConfig aiVmConfig,
+            QuantumVmConfig quantumVmConfig,
+            NodeEligibilityConfig nodeEligibilityConfig
     ) {
     }
 
@@ -67,10 +74,19 @@ public final class FabricModels {
     public record HoneypotConfig(String simulatedVulnerabilityPersona, String telemetryAttackIncidentAlertingQueue) {
     }
 
-    public record ServerProvisionStatus(String serverId, AllocationMetadata allocationMetadata, RuntimeState runtimeState) {
+    public record AiVmConfig(String modelRuntime, String acceleratorProfile, Integer inferencePort) {
     }
 
-    public record AllocationMetadata(String assignedClusterIp, Instant bootstrapTimestamp) {
+    public record QuantumVmConfig(String qpuSimulator, Integer qubitCount, String circuitRuntime) {
+    }
+
+    public record NodeEligibilityConfig(String bootstrapEndpoint, String checkScript, String installScript) {
+    }
+
+    public record ServerProvisionStatus(String serverId, AllocationMetadata allocationMetadata, RuntimeState runtimeState, List<String> nextActions) {
+    }
+
+    public record AllocationMetadata(String assignedClusterIp, String internetIpAddress, String registeredMacAddress, String placementMode, Instant bootstrapTimestamp) {
     }
 
     public record FirewallRuleEntity(String sourceCidrBlock, String networkDestinationPort, String policyAction) {
@@ -139,6 +155,35 @@ public final class FabricModels {
     public record ScrambleExecutionSummary(String randomizationLoopStatus, int affectedInterfacesCount) {
     }
 
+    public record DeviceRegistrationRequest(
+            @NotBlank String nodeName,
+            @NotBlank String macAddress,
+            @NotBlank String internetIpAddress,
+            @NotBlank String fabricIpAddress,
+            String deviceClass
+    ) {
+    }
+
+    public record DeviceRegistrationResponse(String registrationId, String networkState, List<String> assignedPolicies) {
+    }
+
+    public record HardwareOverview(
+            String physicalHost,
+            Map<String, Object> cpu,
+            Map<String, Object> memory,
+            Map<String, Object> storage,
+            Map<String, Object> network,
+            List<String> aiSuggestions,
+            List<String> alerts
+    ) {
+    }
+
+    public record AiGuidePrompt(@NotBlank String message, Map<String, Object> context) {
+    }
+
+    public record AiGuideResponse(String guideId, String persona, String response, List<String> suggestedActions) {
+    }
+
     public record PolyglotFunctionBlueprintRequest(
             @NotBlank String targetPlatform,
             @NotBlank String functionName,
@@ -176,7 +221,7 @@ public final class FabricModels {
     }
 
     public enum NodeRole {
-        CCNP_EDGE_CORE, HONEYPOT_DECOY, DATABASE_SERVER, APPLICATION_SERVER, FIREWALL_APPLIANCE
+        CCNP_EDGE_CORE, HONEYPOT_DECOY, DATABASE_SERVER, APPLICATION_SERVER, FIREWALL_APPLIANCE, AI_VM, QUANTUM_VM
     }
 
     public enum NodeStatus {

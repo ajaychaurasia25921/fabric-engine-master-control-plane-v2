@@ -1,12 +1,15 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import {
+  askAiGuide,
   createFirewallRule,
   executeFilePipeline,
   executeQuantumCircuit,
+  fetchHardwareOverview,
   fetchFirewallRules,
   fetchHoneypotIncidents,
   provisionServer,
+  registerDevice,
   runTerminalCommand,
   scrambleIdentity,
   spawnSocket,
@@ -59,6 +62,13 @@ const pipelines = ref([]);
 const quantumOutput = ref('System core idle. Submit a compiled circuit mapping array to monitor gate transformations...');
 const quantumStatus = ref('STANDBY');
 const socketOutput = ref('');
+const hardwareOverview = ref(null);
+const deviceRegistration = ref(null);
+const aiGuideOpen = ref(true);
+const aiGuideInput = ref('How do I provision an AI VM and register it on the fabric?');
+const aiGuideMessages = ref([
+  { role: 'guide', text: 'Hi, I am your Fabric Companion. Ask me about provisioning, wiring, alerts, or node eligibility.' }
+]);
 const packetCanvasOpen = ref(false);
 const vdiOpen = ref(false);
 const vdiConnected = ref(false);
@@ -89,7 +99,20 @@ const serverForm = reactive({
   runtimeEnvironment: 'NODEJS_V8',
   targetServicePort: 8080,
   simulatedVulnerabilityPersona: 'VULNERABLE_SSH',
-  telemetryAttackIncidentAlertingQueue: 'amqp://sec-broker/alerts.honeypot'
+  telemetryAttackIncidentAlertingQueue: 'amqp://sec-broker/alerts.honeypot',
+  placementMode: 'PHYSICAL_HOST_VM',
+  registeredMacAddress: '02:42:ac:11:00:21',
+  internetIpAddress: '192.168.1.120',
+  fabricIpAddress: '10.194.24.180',
+  modelRuntime: 'OLLAMA_LLAMA_3_2',
+  acceleratorProfile: 'CPU_LOCAL',
+  inferencePort: 11434,
+  qpuSimulator: 'QISKIT_AER_VM',
+  qubitCount: 32,
+  circuitRuntime: 'OPENQASM_3',
+  bootstrapEndpoint: 'ssh://fabric-node-02.local',
+  checkScript: 'scripts/check-node-eligibility.sh',
+  installScript: 'scripts/promote-node-server.sh'
 });
 const terminalForm = reactive({ targetedHostEndpoint: '10.194.24.102', protocolDialectMode: 'SSH', rawCommandText: 'show interface brief' });
 const firewallForm = reactive({ sourceCidrBlock: '10.0.0.0/8', networkDestinationPort: '23/TCP', policyAction: 'DROP' });
@@ -111,6 +134,7 @@ onMounted(async () => {
   try {
     firewallRules.value = await fetchFirewallRules();
     incidents.value = await fetchHoneypotIncidents();
+    hardwareOverview.value = await fetchHardwareOverview();
   } catch {
     notify('Backend control-plane APIs are still warming up.');
   }
@@ -141,6 +165,10 @@ async function submitServer() {
     deploymentFramework: serverForm.deploymentFramework,
     executionScope: serverForm.executionScope,
     targetRoleClass: serverForm.targetRoleClass,
+    placementMode: serverForm.placementMode,
+    registeredMacAddress: serverForm.registeredMacAddress,
+    internetIpAddress: serverForm.internetIpAddress,
+    fabricIpAddress: serverForm.fabricIpAddress,
     dbRoleConfig: serverForm.targetRoleClass === 'DATABASE_SERVER' ? {
       databaseEngine: serverForm.databaseEngine,
       localListeningPort: Number(serverForm.localListeningPort)
@@ -152,9 +180,31 @@ async function submitServer() {
     honeypotConfig: serverForm.targetRoleClass === 'HONEYPOT_DECOY' ? {
       simulatedVulnerabilityPersona: serverForm.simulatedVulnerabilityPersona,
       telemetryAttackIncidentAlertingQueue: serverForm.telemetryAttackIncidentAlertingQueue
+    } : undefined,
+    aiVmConfig: serverForm.targetRoleClass === 'AI_VM' ? {
+      modelRuntime: serverForm.modelRuntime,
+      acceleratorProfile: serverForm.acceleratorProfile,
+      inferencePort: Number(serverForm.inferencePort)
+    } : undefined,
+    quantumVmConfig: serverForm.targetRoleClass === 'QUANTUM_VM' ? {
+      qpuSimulator: serverForm.qpuSimulator,
+      qubitCount: Number(serverForm.qubitCount),
+      circuitRuntime: serverForm.circuitRuntime
+    } : undefined,
+    nodeEligibilityConfig: serverForm.placementMode === 'REMOTE_NODE' ? {
+      bootstrapEndpoint: serverForm.bootstrapEndpoint,
+      checkScript: serverForm.checkScript,
+      installScript: serverForm.installScript
     } : undefined
   };
   const response = await provisionServer(payload);
+  deviceRegistration.value = await registerDevice({
+    nodeName: payload.serverName,
+    macAddress: payload.registeredMacAddress,
+    internetIpAddress: payload.internetIpAddress,
+    fabricIpAddress: payload.fabricIpAddress,
+    deviceClass: payload.targetRoleClass
+  });
   inventory.value = [{
     id: response.serverId,
     name: payload.serverName,
@@ -166,6 +216,15 @@ async function submitServer() {
   }, ...inventory.value];
   notify(`Node allocation loop '${payload.serverName}' triggered successfully.`);
   activeTab.value = 'dashboard';
+}
+
+async function sendGuideMessage() {
+  const message = aiGuideInput.value.trim();
+  if (!message) return;
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'user', text: message }];
+  aiGuideInput.value = '';
+  const response = await askAiGuide({ message, context: { activeTab: activeTab.value, inventory: inventory.value } });
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: response.response, actions: response.suggestedActions }];
 }
 
 function terminateInstance(id) {
@@ -490,6 +549,26 @@ function handleVdiCommand() {
         </section>
 
         <FabricCanvas mode="static" />
+
+        <section class="panel">
+          <div class="panel-title-row">
+            <div>
+              <h3>360 Physical Host Hardware Monitor</h3>
+              <p class="muted">All VMs are allocated from the local physical system pool unless a remote node passes eligibility.</p>
+            </div>
+            <span class="status-chip green">{{ hardwareOverview?.physicalHost || 'local-physical-host' }}</span>
+          </div>
+          <div class="hardware-grid">
+            <article><span>CPU</span><strong>{{ hardwareOverview?.cpu?.loadPercent ?? 42 }}%</strong><small>{{ hardwareOverview?.cpu?.thermalState ?? 'NOMINAL' }}</small></article>
+            <article><span>Memory</span><strong>{{ hardwareOverview?.memory?.usedGb ?? 18 }} / {{ hardwareOverview?.memory?.totalGb ?? 32 }} GB</strong><small>{{ hardwareOverview?.memory?.pressure ?? 'LOW' }}</small></article>
+            <article><span>VM Pool</span><strong>{{ hardwareOverview?.storage?.usedGb ?? 226 }} / {{ hardwareOverview?.storage?.vmPoolGb ?? 512 }} GB</strong><small>{{ hardwareOverview?.storage?.iopsState ?? 'HEALTHY' }}</small></article>
+            <article><span>Network</span><strong>{{ hardwareOverview?.network?.fabricInterfaces ?? 2 }} NICs</strong><small>Internet + Fabric bridge</small></article>
+          </div>
+          <div class="suggestion-list">
+            <strong>AI Suggestions & Alerts</strong>
+            <p v-for="item in [...(hardwareOverview?.aiSuggestions ?? []), ...(hardwareOverview?.alerts ?? [])]" :key="item">{{ item }}</p>
+          </div>
+        </section>
       </section>
 
       <section v-if="activeTab === 'servers'" class="tab-page">
@@ -502,13 +581,23 @@ function handleVdiCommand() {
               <label>Parent Hardware UUID Mapping<input v-model="serverForm.parentNodeId" required /></label>
             </div>
             <div class="form-pair">
-              <label>Deployment Framework Target<select v-model="serverForm.deploymentFramework"><option>BARE_METAL_PHYSICAL</option><option>VIRTUAL_MACHINE</option></select></label>
+              <label>Deployment Framework Target<select v-model="serverForm.deploymentFramework" :disabled="serverForm.targetRoleClass === 'QUANTUM_VM'"><option>BARE_METAL_PHYSICAL</option><option>VIRTUAL_MACHINE</option></select></label>
               <label>Execution Framework Scope<select v-model="serverForm.executionScope"><option>REAL</option><option>SIMULATED</option></select></label>
+            </div>
+            <div class="form-pair">
+              <label>Provisioning Placement<select v-model="serverForm.placementMode"><option value="PHYSICAL_HOST_VM">Physical System VM Pool</option><option value="REMOTE_NODE">Remote Node Server Promotion</option></select></label>
+              <label>Registered MAC Address<input v-model="serverForm.registeredMacAddress" required /></label>
+            </div>
+            <div class="form-pair">
+              <label>Internet IP Address<input v-model="serverForm.internetIpAddress" required /></label>
+              <label>Fabric Network IP Address<input v-model="serverForm.fabricIpAddress" required /></label>
             </div>
             <div class="segmented">
               <button type="button" :class="{ active: serverForm.targetRoleClass === 'DATABASE_SERVER' }" @click="serverForm.targetRoleClass = 'DATABASE_SERVER'">Database Engine</button>
               <button type="button" :class="{ active: serverForm.targetRoleClass === 'APPLICATION_SERVER' }" @click="serverForm.targetRoleClass = 'APPLICATION_SERVER'">Application Host</button>
               <button type="button" :class="{ active: serverForm.targetRoleClass === 'HONEYPOT_DECOY' }" @click="serverForm.targetRoleClass = 'HONEYPOT_DECOY'">Honeypot Decoy Target</button>
+              <button type="button" :class="{ active: serverForm.targetRoleClass === 'AI_VM' }" @click="serverForm.targetRoleClass = 'AI_VM'; serverForm.deploymentFramework = 'VIRTUAL_MACHINE'">AI VM</button>
+              <button type="button" :class="{ active: serverForm.targetRoleClass === 'QUANTUM_VM' }" @click="serverForm.targetRoleClass = 'QUANTUM_VM'; serverForm.deploymentFramework = 'VIRTUAL_MACHINE'">Quantum VM</button>
             </div>
             <div v-if="serverForm.targetRoleClass === 'DATABASE_SERVER'" class="subschema">
               <label>Database Engine<select v-model="serverForm.databaseEngine"><option>POSTGRESQL</option><option>MONGO_DB</option><option>MYSQL</option><option>MS_SQL</option></select></label>
@@ -522,6 +611,22 @@ function handleVdiCommand() {
               <label>Simulated Vulnerability<select v-model="serverForm.simulatedVulnerabilityPersona"><option>VULNERABLE_SSH</option><option>EXPOSED_TELNET</option><option>EXPOSED_REDIS</option></select></label>
               <label>Incident Queue<input v-model="serverForm.telemetryAttackIncidentAlertingQueue" /></label>
             </div>
+            <div v-if="serverForm.targetRoleClass === 'AI_VM'" class="subschema">
+              <label>Model Runtime<select v-model="serverForm.modelRuntime"><option>OLLAMA_LLAMA_3_2</option><option>OLLAMA_MISTRAL</option><option>LOCAL_ONNX_RUNTIME</option></select></label>
+              <label>Accelerator Profile<select v-model="serverForm.acceleratorProfile"><option>CPU_LOCAL</option><option>GPU_PASSTHROUGH</option><option>NPU_EDGE</option></select></label>
+              <label>Inference Port<input v-model="serverForm.inferencePort" type="number" /></label>
+            </div>
+            <div v-if="serverForm.targetRoleClass === 'QUANTUM_VM'" class="subschema">
+              <label>QPU Simulator<select v-model="serverForm.qpuSimulator"><option>QISKIT_AER_VM</option><option>BRAKET_LOCAL_VM</option><option>CIRQ_SIMULATOR_VM</option></select></label>
+              <label>Qubit Count<input v-model="serverForm.qubitCount" type="number" /></label>
+              <label>Circuit Runtime<input v-model="serverForm.circuitRuntime" /></label>
+            </div>
+            <div v-if="serverForm.placementMode === 'REMOTE_NODE'" class="subschema">
+              <label>Node Bootstrap Endpoint<input v-model="serverForm.bootstrapEndpoint" /></label>
+              <label>Eligibility Check Script<input v-model="serverForm.checkScript" /></label>
+              <label>Promotion Install Script<input v-model="serverForm.installScript" /></label>
+            </div>
+            <p v-if="deviceRegistration" class="empty-state">Last registration: {{ deviceRegistration.networkState }} · {{ deviceRegistration.assignedPolicies.join(' | ') }}</p>
             <button class="primary-button">Spark Lifecycle Provisioning Instance</button>
           </form>
         </section>
@@ -748,6 +853,26 @@ function handleVdiCommand() {
       </div>
       <pre v-else>{{ vdiOutput.join('\n\n') }}</pre>
       <label v-if="vdiForm.sessionMode === 'CLI'" class="vdi-input"><span>guest_vm@fabric-node:~$</span><input v-model="vdiCommand" @keydown.enter="handleVdiCommand" placeholder="Input guest OS subcommands..." /></label>
+    </section>
+
+    <section :class="['ai-guide', { collapsed: !aiGuideOpen }]">
+      <button class="guide-avatar" @click="aiGuideOpen = !aiGuideOpen">AI</button>
+      <div v-if="aiGuideOpen" class="guide-panel">
+        <header>
+          <strong>Fabric Companion</strong>
+          <span>talking NLP guide</span>
+        </header>
+        <div class="guide-messages">
+          <article v-for="(message, index) in aiGuideMessages" :key="index" :class="message.role">
+            <p>{{ message.text }}</p>
+            <small v-if="message.actions">{{ message.actions.join(' · ') }}</small>
+          </article>
+        </div>
+        <form @submit.prevent="sendGuideMessage">
+          <input v-model="aiGuideInput" placeholder="Ask about VMs, nodes, wiring, alerts..." />
+          <button>Send</button>
+        </form>
+      </div>
     </section>
 
     <div v-if="toast" class="toast">{{ toast }}</div>
