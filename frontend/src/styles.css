@@ -1380,7 +1380,7 @@ textarea {
 
 .guide-settings {
   display: grid;
-  grid-template-columns: 1fr 1fr 78px 1fr auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-items: end;
   border-bottom: 1px solid #1f2937;
@@ -1409,6 +1409,8 @@ textarea {
   background: rgba(15, 118, 110, 0.28);
   font-size: 12px;
   font-weight: 900;
+  grid-column: 1 / -1;
+  text-align: center;
 }
 
 .guide-settings button.listening {
