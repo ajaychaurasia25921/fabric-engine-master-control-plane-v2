@@ -135,6 +135,8 @@ const vdiOutput = ref([
 ]);
 const vdiCommand = ref('');
 const vdiForm = reactive({ targetNodeId: 'vm-1', sessionMode: 'CLI' });
+const activeVdiApp = ref('workbench');
+const vdiSharedFiles = ref([]);
 const terminalConnected = ref(false);
 const terminalUser = ref('cisco_admin');
 const terminalPrompt = computed(() => (terminalForm.protocolDialectMode === 'SSH' ? 'ssh$' : 'telnet>'));
@@ -849,6 +851,7 @@ function triggerFakeHoneypotIntrusion(attackerIpSource, vectorProfile, targetedP
 function launchVdiSession() {
   const node = selectedVdiNode.value;
   vdiConnected.value = true;
+  activeVdiApp.value = vdiForm.sessionMode === 'GUI' ? 'workbench' : 'terminal';
   if (vdiForm.sessionMode === 'GUI') {
     vdiOutput.value = [
       `[GUI] Connected to ${node.name} (${node.ip})`,
@@ -864,12 +867,28 @@ function launchVdiSession() {
   }
 }
 
+function openVdiApp(app) {
+  if (!vdiConnected.value) {
+    launchVdiSession();
+  }
+  activeVdiApp.value = app;
+}
+
+function stageVdiShare() {
+  const node = selectedVdiNode.value;
+  vdiSharedFiles.value = [{
+    name: `diagnostic-${Date.now()}.tar.gz`,
+    route: `local-workstation -> ${node.name}`,
+    state: 'READY_TO_TRANSFER'
+  }, ...vdiSharedFiles.value].slice(0, 6);
+  notify(`VDI file share staged for ${node.name}.`);
+}
+
 function handleVdiCommand() {
   if (!vdiConnected.value) {
     launchVdiSession();
     return;
   }
-  if (vdiForm.sessionMode === 'GUI') return;
   const command = vdiCommand.value.trim();
   if (!command) return;
   const lower = command.toLowerCase();
@@ -1450,10 +1469,48 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
         <button class="primary-button" @click="launchVdiSession">Connect</button>
       </div>
       <div v-if="vdiForm.sessionMode === 'GUI' && vdiConnected" class="vdi-desktop">
-        <article><strong>Fabric Workbench</strong><span>{{ selectedVdiNode.name }}</span></article>
-        <article><strong>Packet Console</strong><span>{{ selectedVdiNode.ip }}</span></article>
-        <article><strong>File Share</strong><span>Ready for node transfer</span></article>
-        <article><strong>Metrics Monitor</strong><span>{{ selectedVdiNode.state }}</span></article>
+        <aside class="vdi-dock">
+          <button :class="{ active: activeVdiApp === 'workbench' }" @click="openVdiApp('workbench')">Workbench</button>
+          <button :class="{ active: activeVdiApp === 'terminal' }" @click="openVdiApp('terminal')">Terminal</button>
+          <button :class="{ active: activeVdiApp === 'files' }" @click="openVdiApp('files')">Files</button>
+          <button :class="{ active: activeVdiApp === 'packets' }" @click="openVdiApp('packets')">Packets</button>
+          <button :class="{ active: activeVdiApp === 'metrics' }" @click="openVdiApp('metrics')">Metrics</button>
+        </aside>
+        <section class="vdi-app-window">
+          <header>
+            <strong>{{ selectedVdiNode.name }}</strong>
+            <span>{{ selectedVdiNode.ip }} · {{ selectedVdiNode.role }} · {{ selectedVdiNode.state }}</span>
+          </header>
+          <div v-if="activeVdiApp === 'workbench'" class="vdi-app-grid">
+            <article><strong>Node Identity</strong><span>{{ selectedVdiNode.name }}</span><small>{{ selectedVdiNode.platform }}</small></article>
+            <article><strong>Access Mode</strong><span>GUI session active</span><small>CLI available from dock</small></article>
+            <article><strong>Network</strong><span>{{ selectedVdiNode.ip }}</span><small>Fabric bridge linked</small></article>
+            <article><strong>Operations</strong><span>Ready</span><small>Files, packets, metrics enabled</small></article>
+          </div>
+          <div v-if="activeVdiApp === 'terminal'" class="vdi-terminal-pane">
+            <pre>{{ vdiOutput.join('\n\n') }}</pre>
+            <label class="vdi-input embedded"><span>guest_vm@{{ selectedVdiNode.name }}:~$</span><input v-model="vdiCommand" @keydown.enter="handleVdiCommand" placeholder="help, sysinfo, netstat, clear" /></label>
+          </div>
+          <div v-if="activeVdiApp === 'files'" class="vdi-app-list">
+            <button class="primary-button" @click="stageVdiShare">Stage File Transfer</button>
+            <article v-for="file in vdiSharedFiles" :key="file.name">
+              <strong>{{ file.name }}</strong>
+              <span>{{ file.route }} · {{ file.state }}</span>
+            </article>
+            <p v-if="!vdiSharedFiles.length" class="empty-state">No GUI file transfers staged yet.</p>
+          </div>
+          <div v-if="activeVdiApp === 'packets'" class="vdi-app-list">
+            <article><strong>Route Probe</strong><span>{{ selectedVdiNode.ip }} -> fabric gateway · reachable</span></article>
+            <article><strong>Immutable Payload Policy</strong><span>Encrypted payload locked; metadata visible only</span></article>
+            <article><strong>Fallback Tunnel</strong><span>Available if risk score is elevated</span></article>
+          </div>
+          <div v-if="activeVdiApp === 'metrics'" class="vdi-app-grid">
+            <article><strong>CPU</strong><span>{{ hardwareOverview?.cpu?.loadPercent ?? 0 }}%</span><small>{{ hardwareOverview?.cpu?.thermalState ?? 'NOMINAL' }}</small></article>
+            <article><strong>Memory</strong><span>{{ hardwareOverview?.memory?.usedPercent ?? 0 }}%</span><small>{{ hardwareOverview?.memory?.pressure ?? 'LOW' }}</small></article>
+            <article><strong>Threads</strong><span>{{ hardwareOverview?.threads?.live ?? 0 }}</span><small>live JVM threads</small></article>
+            <article><strong>VM Pool</strong><span>{{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</span><small>{{ hardwareOverview?.storage?.freeGb ?? 0 }} GB free</small></article>
+          </div>
+        </section>
       </div>
       <pre v-else>{{ vdiOutput.join('\n\n') }}</pre>
       <label v-if="vdiForm.sessionMode === 'CLI'" class="vdi-input"><span>guest_vm@fabric-node:~$</span><input v-model="vdiCommand" @keydown.enter="handleVdiCommand" placeholder="Input guest OS subcommands..." /></label>
