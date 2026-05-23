@@ -126,15 +126,37 @@ button {
   gap: 4px;
 }
 
-.nav-group h2 {
-  margin: 0 0 3px;
-  padding: 0 12px;
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 9px;
   color: #64748b;
+  background: transparent;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.nav-group-toggle:hover {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.nav-group-toggle b {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.nav-group-items {
+  display: grid;
+  gap: 4px;
 }
 
 .nav-button,
@@ -1585,7 +1607,7 @@ textarea {
 }
 
 :root[data-theme="light"] .nav-button,
-:root[data-theme="light"] .nav-group h2,
+:root[data-theme="light"] .nav-group-toggle,
 :root[data-theme="light"] .muted,
 :root[data-theme="light"] .brand-block p,
 :root[data-theme="light"] .topbar p,
@@ -1606,6 +1628,15 @@ textarea {
 :root[data-theme="light"] .vdi-picker label,
 :root[data-theme="light"] .vdi-desktop span {
   color: #475569;
+}
+
+:root[data-theme="light"] .nav-group-toggle:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+:root[data-theme="light"] .nav-group-toggle b {
+  color: #334155;
 }
 
 :root[data-theme="light"] .panel h3,

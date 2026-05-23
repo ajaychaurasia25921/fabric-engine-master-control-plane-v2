@@ -81,6 +81,7 @@ const tabCopy = {
 
 const activeTab = ref('dashboard');
 const themeMode = ref('system');
+const openNavGroups = reactive(Object.fromEntries(navGroups.map((group) => [group.label, true])));
 const toast = ref('');
 const inventory = ref([
   { id: 'vm-1', name: 'edge-ingress-router-r1', role: 'CCNP_EDGE_CORE', platform: 'QEMU / KVM Host Bridge', ip: '10.194.24.102', uptime: '142h 11m', state: 'RUNNING' },
@@ -274,6 +275,15 @@ onBeforeUnmount(() => {
 });
 
 watch(themeMode, applyTheme);
+
+function toggleNavGroup(groupLabel) {
+  openNavGroups[groupLabel] = !openNavGroups[groupLabel];
+}
+
+function selectTab(tabId, groupLabel) {
+  activeTab.value = tabId;
+  openNavGroups[groupLabel] = true;
+}
 
 function notify(message) {
   toast.value = message;
@@ -879,15 +889,25 @@ function handleVdiCommand() {
 
         <nav class="nav-list">
           <section v-for="group in navGroups" :key="group.label" class="nav-group">
-            <h2>{{ group.label }}</h2>
             <button
-              v-for="[id, label] in group.tabs"
-              :key="id"
-              :class="['nav-button', { active: activeTab === id }]"
-              @click="activeTab = id"
+              type="button"
+              class="nav-group-toggle"
+              :aria-expanded="openNavGroups[group.label]"
+              @click="toggleNavGroup(group.label)"
             >
-              {{ label }}
+              <span>{{ group.label }}</span>
+              <b>{{ openNavGroups[group.label] ? '−' : '+' }}</b>
             </button>
+            <div v-show="openNavGroups[group.label]" class="nav-group-items">
+              <button
+                v-for="[id, label] in group.tabs"
+                :key="id"
+                :class="['nav-button', { active: activeTab === id }]"
+                @click="selectTab(id, group.label)"
+              >
+                {{ label }}
+              </button>
+            </div>
           </section>
         </nav>
       </div>
