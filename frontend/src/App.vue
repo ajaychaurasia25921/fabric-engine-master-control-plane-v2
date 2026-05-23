@@ -1464,7 +1464,7 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
       <div v-if="aiGuideOpen" class="guide-panel">
         <header>
           <strong>{{ aiPersonaName }}</strong>
-          <span>agentic NLP guide</span>
+          <span>CEO-agent · founder approval required</span>
         </header>
         <div class="guide-settings">
           <label>Agent
@@ -1506,7 +1506,7 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
           </article>
         </div>
         <div v-if="aiPendingActions.length" class="agent-actions">
-          <strong>Needs your approval</strong>
+          <strong>Founder approval required</strong>
           <article v-for="action in aiPendingActions" :key="action.actionId">
             <div>
               <b>{{ action.label }}</b>

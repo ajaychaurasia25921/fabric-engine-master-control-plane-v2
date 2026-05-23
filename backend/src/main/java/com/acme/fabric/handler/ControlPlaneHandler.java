@@ -322,6 +322,13 @@ public class ControlPlaneHandler {
                                         Map.of("target", "360-view")
                                 ),
                                 new AgentActionProposal(
+                                        "open-approval-dashboard",
+                                        "Open Approval Dashboard",
+                                        "Review CEO-agent recommendations with founder/owner authority before execution.",
+                                        "OPEN_TAB",
+                                        Map.of("target", "approvals")
+                                ),
+                                new AgentActionProposal(
                                         "prepare-ai-vm",
                                         "Prepare AI VM Form",
                                         "Switch provisioning to AI VM on the local physical host pool.",
@@ -473,19 +480,21 @@ public class ControlPlaneHandler {
         String language = prompt.language() == null ? "auto" : prompt.language();
         String message = prompt.message() == null ? "" : prompt.message();
         if ("hi-IN".equals(language) || message.matches(".*[\\u0900-\\u097F].*")) {
-            return persona + " bol rahi hoon. Theek hai, maine aapki baat dhyaan se samajh li: " + message
-                    + ". Main pehle simple Hindi-Hinglish mein plan bataungi, phir action ka proposal dungi. "
+            return persona + " bol rahi hoon. Main Reactor ki CEO-agent hoon: product direction, risk priority, aur operating plan main sambhaalungi. "
+                    + "Lekin aap founder/owner ho, final approval hamesha aapka rahega. Maine aapki baat samajh li: " + message
+                    + ". Main pehle simple Hindi-Hinglish mein plan bataungi, phir approval dashboard mein decision proposal dungi. "
                     + "Aapke approve kiye bina main VM, server, packet route, ya security policy mein koi change nahi karungi. "
                     + "Abhi safest next step hai 360 View mein CPU, memory, JVM heap, threads aur VM pool pressure dekhna, "
                     + "phir jis node par kaam karna hai uska exact naam bol dijiye.";
         }
         if ("en-IN".equals(language) || "auto".equals(language)) {
-            return persona + " here. Haan, I understood you. You said: " + message
+            return persona + " here. I am operating as Reactor CEO-agent: I can shape product priorities, assess risk, and prepare decisions. "
+                    + "You remain founder/owner, so final authority stays with you. I understood your request: " + message
                     + ". I will guide you step by step in natural Indian English or Hinglish, keep the risk visible, "
-                    + "and ask before I touch Reactor state. For this request, I would first check 360 health, "
+                    + "and move every platform-changing action into the approval dashboard before execution. For this request, I would first check 360 health, "
                     + "confirm the target node or VM, then prepare the action for your approval.";
         }
         return persona + " here. I understood your request: " + message
-                + ". I will explain the plan clearly, keep decisions under your approval, and prepare safe next actions only after you confirm.";
+                + ". I will act as Reactor CEO-agent, explain the plan clearly, keep founder/owner approval as the final gate, and prepare safe next actions only after you confirm.";
     }
 }

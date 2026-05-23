@@ -810,6 +810,66 @@ textarea {
   margin: 0;
 }
 
+.approval-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.approval-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 14px;
+  background: #030712;
+}
+
+.approval-card h4,
+.approval-card p {
+  margin: 0;
+}
+
+.approval-card h4 {
+  color: #f8fafc;
+}
+
+.approval-card p,
+.approval-card dd {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.approval-card dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0;
+}
+
+.approval-card dt {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.approval-card dd {
+  margin: 0;
+}
+
+.approval-card pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 10px;
+  color: #a7f3d0;
+  background: #020617;
+  font-size: 11px;
+}
+
 .about-hero {
   min-height: 260px;
   display: grid;
@@ -1591,6 +1651,7 @@ textarea {
 :root[data-theme="light"] .properties-panel,
 :root[data-theme="light"] .metric-card,
 :root[data-theme="light"] .hardware-grid article,
+:root[data-theme="light"] .approval-card,
 :root[data-theme="light"] .metric-chart,
 :root[data-theme="light"] .guide-panel,
 :root[data-theme="light"] .vdi-window,
@@ -1621,6 +1682,8 @@ textarea {
 :root[data-theme="light"] .event-row span,
 :root[data-theme="light"] .event-row p,
 :root[data-theme="light"] .event-row small,
+:root[data-theme="light"] .approval-card p,
+:root[data-theme="light"] .approval-card dd,
 :root[data-theme="light"] .dropzone span,
 :root[data-theme="light"] .hop-row span,
 :root[data-theme="light"] .guide-messages small,
@@ -1647,6 +1710,7 @@ textarea {
 :root[data-theme="light"] .metric-card strong,
 :root[data-theme="light"] .brand-block h1,
 :root[data-theme="light"] .event-row strong,
+:root[data-theme="light"] .approval-card h4,
 :root[data-theme="light"] .guide-messages p,
 :root[data-theme="light"] .agent-actions b,
 :root[data-theme="light"] .chart-head strong,
@@ -1664,6 +1728,7 @@ textarea {
 :root[data-theme="light"] .status-chip,
 :root[data-theme="light"] .console-frame,
 :root[data-theme="light"] .log-frame,
+:root[data-theme="light"] .approval-card pre,
 :root[data-theme="light"] .event-row,
 :root[data-theme="light"] .dropzone,
 :root[data-theme="light"] .empty-state,
@@ -1682,6 +1747,10 @@ textarea {
   color: #0f172a;
   border-color: #cbd5e1;
   background: #f8fafc;
+}
+
+:root[data-theme="light"] .approval-card dt {
+  color: #334155;
 }
 
 :root[data-theme="light"] table {
