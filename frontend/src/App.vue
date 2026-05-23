@@ -788,30 +788,54 @@ function handleVdiCommand() {
               <h3>360 Physical System Diagnostics</h3>
               <p class="muted">Spring Boot Admin-style operating view for host health, actuator-like telemetry, JVM/runtime state, and AI suggestions.</p>
             </div>
-            <span class="status-chip green">{{ hardwareOverview?.physicalHost || 'local-physical-host' }}</span>
+            <span class="status-chip" :class="hardwareOverview?.health?.status === 'UP' ? 'green' : 'amber'">{{ hardwareOverview?.health?.status || 'UP' }}</span>
           </div>
           <div class="hardware-grid">
-            <article><span>CPU</span><strong>{{ hardwareOverview?.cpu?.loadPercent ?? 42 }}%</strong><small>{{ hardwareOverview?.cpu?.thermalState ?? 'NOMINAL' }}</small></article>
-            <article><span>Memory</span><strong>{{ hardwareOverview?.memory?.usedGb ?? 18 }} / {{ hardwareOverview?.memory?.totalGb ?? 32 }} GB</strong><small>{{ hardwareOverview?.memory?.pressure ?? 'LOW' }}</small></article>
-            <article><span>VM Pool</span><strong>{{ hardwareOverview?.storage?.usedGb ?? 226 }} / {{ hardwareOverview?.storage?.vmPoolGb ?? 512 }} GB</strong><small>{{ hardwareOverview?.storage?.iopsState ?? 'HEALTHY' }}</small></article>
-            <article><span>Network</span><strong>{{ hardwareOverview?.network?.fabricInterfaces ?? 2 }} NICs</strong><small>Internet + Fabric bridge</small></article>
+            <article v-for="card in diagnosticCards" :key="card.label">
+              <span>{{ card.label }}</span>
+              <strong>{{ card.value }}</strong>
+              <small>{{ card.detail }}</small>
+            </article>
+          </div>
+          <div class="metric-chart-grid">
+            <article v-for="chart in diagnosticCharts" :key="chart.key" class="metric-chart">
+              <div class="chart-head">
+                <span>{{ chart.label }}</span>
+                <strong>{{ latestChartValue(chart.key) }}</strong>
+              </div>
+              <svg viewBox="0 0 100 56" preserveAspectRatio="none" role="img">
+                <line x1="0" y1="54" x2="100" y2="54" />
+                <line x1="0" y1="28" x2="100" y2="28" />
+                <polyline :points="chartPoints(chart.key)" :stroke="chart.color" />
+              </svg>
+              <small>{{ hardwareHistory.at(-1)?.time || 'waiting for sample' }}</small>
+            </article>
           </div>
         </section>
         <section class="admin-grid">
-          <article class="panel"><h3>Health</h3><pre class="console-frame compact">UP
-db: UP
-r2dbc: UP
-ollama: DEGRADED fallback-ready
-sse: UP</pre></article>
+          <article class="panel"><h3>Health</h3><pre class="console-frame compact">status: {{ hardwareOverview?.health?.status ?? 'UP' }}
+db: {{ hardwareOverview?.health?.db ?? 'UP' }}
+r2dbc: {{ hardwareOverview?.health?.r2dbc ?? 'UP' }}
+ollama: {{ hardwareOverview?.health?.ollama ?? 'LOCAL_OR_FALLBACK_READY' }}
+sse: {{ hardwareOverview?.health?.sse ?? 'UP' }}
+checked: {{ hardwareOverview?.health?.checkedAt ?? 'warming' }}</pre></article>
+          <article class="panel"><h3>Process & Threads</h3><pre class="console-frame compact">host: {{ hardwareOverview?.physicalHost ?? 'local-physical-host' }}
+pid: {{ hardwareOverview?.process?.pid ?? 'local' }}
+uptime: {{ formatDuration(hardwareOverview?.process?.uptimeSeconds ?? 0) }}
+live threads: {{ hardwareOverview?.threads?.live ?? 0 }}
+daemon threads: {{ hardwareOverview?.threads?.daemon ?? 0 }}
+total started: {{ hardwareOverview?.threads?.totalStarted ?? 0 }}</pre></article>
+          <article class="panel"><h3>JVM / VM</h3><pre class="console-frame compact">vm: {{ hardwareOverview?.jvm?.name ?? 'JVM' }}
+vendor: {{ hardwareOverview?.jvm?.vendor ?? 'Eclipse Adoptium' }}
+heap: {{ hardwareOverview?.jvm?.heapUsedMb ?? 0 }} / {{ hardwareOverview?.jvm?.heapMaxMb ?? 0 }} MB
+non-heap: {{ hardwareOverview?.jvm?.nonHeapUsedMb ?? 0 }} MB
+classes: {{ hardwareOverview?.jvm?.loadedClasses ?? 0 }}
+vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article>
           <article class="panel"><h3>Actuator</h3><pre class="console-frame compact">/actuator/health
-/actuator/metrics
-/actuator/env
-/actuator/loggers
+/actuator/metrics/jvm.memory.used
+/actuator/metrics/process.cpu.usage
+/actuator/metrics/jvm.threads.live
 /api/v1/hardware/overview</pre></article>
-          <article class="panel"><h3>Runtime</h3><pre class="console-frame compact">Spring WebFlux Netty: RUNNING
-Flyway schema: v1
-R2DBC event-loop: non-blocking
-AI mode: local Ollama + rule fallback</pre></article>
           <article class="panel"><h3>AI Suggestions & Alerts</h3><div class="suggestion-list"><p v-for="item in [...(hardwareOverview?.aiSuggestions ?? []), ...(hardwareOverview?.alerts ?? [])]" :key="item">{{ item }}</p></div></article>
         </section>
       </section>
