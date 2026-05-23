@@ -50,6 +50,20 @@ export async function fetchHardwareOverview() {
   return parseJson(response, 'Hardware overview unavailable');
 }
 
+export async function fetchLocalVmProviders() {
+  const response = await fetch(`${API_BASE}/api/v1/local-vms/providers`);
+  return parseJson(response, 'Local VM providers unavailable');
+}
+
+export async function createLocalVm(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/local-vms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Local VM creation failed');
+}
+
 export async function askAiGuide(payload) {
   const response = await fetch(`${API_BASE}/api/v1/ai-guide/chat`, {
     method: 'POST',

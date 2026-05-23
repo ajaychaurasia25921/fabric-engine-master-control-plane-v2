@@ -29,6 +29,8 @@ public class FabricRouter {
                 .andRoute(POST("/api/v1/systems/servers"), controlPlaneHandler::provisionServer)
                 .andRoute(POST("/api/v1/network/devices/register"), controlPlaneHandler::registerDevice)
                 .andRoute(GET("/api/v1/hardware/overview"), controlPlaneHandler::hardwareOverview)
+                .andRoute(GET("/api/v1/local-vms/providers"), controlPlaneHandler::localVmProviders)
+                .andRoute(POST("/api/v1/local-vms"), controlPlaneHandler::createLocalVm)
                 .andRoute(POST("/api/v1/ai-guide/chat"), controlPlaneHandler::aiGuide)
                 .andRoute(GET("/api/v1/security/firewall/rules"), controlPlaneHandler::firewallRules)
                 .andRoute(POST("/api/v1/security/firewall/rules"), controlPlaneHandler::createFirewallRule)

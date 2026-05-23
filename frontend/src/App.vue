@@ -3,11 +3,13 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import {
   askAiGuide,
   createFirewallRule,
+  createLocalVm,
   executeFilePipeline,
   executeQuantumCircuit,
   fetchHardwareOverview,
   fetchFirewallRules,
   fetchHoneypotIncidents,
+  fetchLocalVmProviders,
   provisionServer,
   registerDevice,
   runTerminalCommand,
@@ -24,6 +26,7 @@ const tabs = [
   ['dashboard', 'Main Dashboard'],
   ['360-view', '360 View'],
   ['servers', 'Enterprise Provisioning'],
+  ['local-vms', 'Local VM Workstation'],
   ['sms-gateway', 'SMS Gateway Hub'],
   ['terminal-access', 'SSH / Telnet Terminals'],
   ['security-plane', 'Firewall & Honeypots'],
@@ -39,6 +42,7 @@ const tabCopy = {
   dashboard: ['System Infrastructure Control Room', 'Unified master plane lifecycle validation interface.'],
   '360-view': ['360 View', 'Physical host diagnostics, actuator-style runtime panels, and AI operations guidance.'],
   servers: ['Enterprise Cluster Provisioning Bay', 'Inject dynamic microcode metadata parameters across server resource blueprints.'],
+  'local-vms': ['Local VM Workstation', 'Create physical-host VMs through VMware vmrun or QEMU with guarded execution.'],
   'sms-gateway': ['SMS Telecom Gateway Aggregator Hub', 'Realtime critical SMS alerting dispatcher framework and transaction monitor.'],
   'terminal-access': ['Secure Remote VTY Terminals Console', 'Direct cryptographic console loop pipelines into cluster edge endpoints.'],
   'security-plane': ['Distributed Firewall Policy Engine & HoneyMesh Planes', 'Ingest attack signature matrices and state filtering configurations.'],
@@ -67,6 +71,8 @@ const quantumOutput = ref('System core idle. Submit a compiled circuit mapping a
 const quantumStatus = ref('STANDBY');
 const socketOutput = ref('');
 const hardwareOverview = ref(null);
+const localVmProviders = ref([]);
+const localVmResult = ref(null);
 const deviceRegistration = ref(null);
 const aiGuideOpen = ref(true);
 const aiGuideInput = ref('How do I provision an AI VM and register it on the fabric?');
@@ -131,6 +137,17 @@ const packetForm = reactive({ sourcePointNode: 'Host-Alpha (VLAN 10)', destinati
 const quantumForm = reactive({ physicalTargetQpu: 'SIMULATED_POLY_MATH_MATRIX', sequenceGateDepth: 64, processingAlgorithmClass: 'VQE_MOLECULAR_SIMULATION' });
 const socketForm = reactive({ localPort: 9000, proxyTarget: 'GRPC_PROTO' });
 const transferForm = reactive({ sourceNodeId: 'vm-1', destinationNodeId: 'vm-2' });
+const localVmForm = reactive({
+  vmName: 'reactor-ai-vm-01',
+  provider: 'VMWARE',
+  guestOsType: 'ubuntu-64',
+  cpuCores: 4,
+  memoryMb: 8192,
+  diskGb: 80,
+  isoPath: '',
+  networkMode: 'NAT',
+  startAfterCreate: false
+});
 
 const pageTitle = computed(() => tabCopy[activeTab.value][0]);
 const pageSubtitle = computed(() => tabCopy[activeTab.value][1]);
@@ -151,6 +168,7 @@ onMounted(async () => {
     firewallRules.value = await fetchFirewallRules();
     incidents.value = await fetchHoneypotIncidents();
     hardwareOverview.value = await fetchHardwareOverview();
+    localVmProviders.value = await fetchLocalVmProviders();
   } catch {
     notify('Backend control-plane APIs are still warming up.');
   }
@@ -168,6 +186,18 @@ function notify(message) {
   window.setTimeout(() => {
     if (toast.value === message) toast.value = '';
   }, 3200);
+}
+
+async function submitLocalVm() {
+  localVmResult.value = await createLocalVm({
+    ...localVmForm,
+    cpuCores: Number(localVmForm.cpuCores),
+    memoryMb: Number(localVmForm.memoryMb),
+    diskGb: Number(localVmForm.diskGb)
+  });
+  notify(localVmResult.value.executed
+    ? `Local VM ${localVmForm.vmName} creation command executed.`
+    : `Local VM ${localVmForm.vmName} plan generated in guarded dry-run mode.`);
 }
 
 async function scrambleCoordinates() {
@@ -746,6 +776,54 @@ AI mode: local Ollama + rule fallback</pre></article>
             <p v-if="deviceRegistration" class="empty-state">Last registration: {{ deviceRegistration.networkState }} · {{ deviceRegistration.assignedPolicies.join(' | ') }}</p>
             <button class="primary-button">Spark Lifecycle Provisioning Instance</button>
           </form>
+        </section>
+      </section>
+
+      <section v-if="activeTab === 'local-vms'" class="tab-page">
+        <section class="panel">
+          <div class="panel-title-row">
+            <div>
+              <h3>VMware-Style Local VM Creator</h3>
+              <p class="muted">Creates VM plans for your physical system using VMware vmrun or QEMU. Real execution is guarded by REACTOR_VM_EXECUTION_ENABLED.</p>
+            </div>
+            <span class="status-chip">Guarded Executor</span>
+          </div>
+          <div class="provider-grid">
+            <article v-for="provider in localVmProviders" :key="provider.provider" class="event-row">
+              <strong>{{ provider.provider }}</strong>
+              <span>{{ provider.available ? 'Available' : 'Not detected' }} · {{ provider.detectedBinary || 'No binary on backend PATH' }}</span>
+              <small>{{ provider.notes }}</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="two-col">
+          <form class="panel form-grid" @submit.prevent="submitLocalVm">
+            <h3>New Virtual Machine</h3>
+            <div class="form-pair">
+              <label>VM Name<input v-model="localVmForm.vmName" required /></label>
+              <label>Provider<select v-model="localVmForm.provider"><option>VMWARE</option><option>QEMU</option></select></label>
+            </div>
+            <div class="form-pair">
+              <label>Guest OS Type<input v-model="localVmForm.guestOsType" placeholder="ubuntu-64" /></label>
+              <label>Network Mode<select v-model="localVmForm.networkMode"><option>NAT</option><option>BRIDGED</option><option>HOST_ONLY</option></select></label>
+            </div>
+            <div class="form-pair">
+              <label>CPU Cores<input v-model="localVmForm.cpuCores" type="number" min="1" /></label>
+              <label>Memory MB<input v-model="localVmForm.memoryMb" type="number" min="512" step="512" /></label>
+            </div>
+            <div class="form-pair">
+              <label>Disk GB<input v-model="localVmForm.diskGb" type="number" min="8" /></label>
+              <label>Installer ISO Path<input v-model="localVmForm.isoPath" placeholder="/Users/ajay/Downloads/ubuntu.iso" /></label>
+            </div>
+            <label class="checkbox-line"><input v-model="localVmForm.startAfterCreate" type="checkbox" /> Start VM after create when execution is enabled</label>
+            <button class="primary-button">Create / Generate VM Plan</button>
+          </form>
+
+          <section class="panel">
+            <h3>Execution Plan</h3>
+            <pre class="console-frame">{{ localVmResult ? JSON.stringify(localVmResult, null, 2) : 'Submit the form to generate VMware/QEMU commands. By default Reactor returns a dry-run plan so your physical machine is not changed without explicit enablement.' }}</pre>
+          </section>
         </section>
       </section>
 

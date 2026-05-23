@@ -187,6 +187,39 @@ public final class FabricModels {
     public record AgentActionProposal(String actionId, String label, String description, String commandType, Map<String, Object> payload) {
     }
 
+    public record LocalVmCreateRequest(
+            @NotBlank String vmName,
+            @NotBlank String provider,
+            @NotBlank String guestOsType,
+            Integer cpuCores,
+            Integer memoryMb,
+            Integer diskGb,
+            String isoPath,
+            String networkMode,
+            Boolean startAfterCreate
+    ) {
+    }
+
+    public record LocalVmProviderStatus(
+            String provider,
+            boolean available,
+            String detectedBinary,
+            String notes
+    ) {
+    }
+
+    public record LocalVmCommandResult(
+            String vmId,
+            String state,
+            boolean executed,
+            String provider,
+            List<String> commands,
+            String stdout,
+            String stderr,
+            List<String> nextSteps
+    ) {
+    }
+
     public record PolyglotFunctionBlueprintRequest(
             @NotBlank String targetPlatform,
             @NotBlank String functionName,

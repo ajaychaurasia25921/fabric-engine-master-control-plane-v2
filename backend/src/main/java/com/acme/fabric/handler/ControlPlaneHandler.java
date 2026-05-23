@@ -30,6 +30,7 @@ import com.acme.fabric.domain.FabricModels.FirewallRuleEntity;
 import com.acme.fabric.domain.FabricModels.HardwareOverview;
 import com.acme.fabric.domain.FabricModels.HoneypotIncidentRecord;
 import com.acme.fabric.domain.FabricModels.IdentityScrambleIntent;
+import com.acme.fabric.domain.FabricModels.LocalVmCreateRequest;
 import com.acme.fabric.domain.FabricModels.PacketTraceRequest;
 import com.acme.fabric.domain.FabricModels.PacketTraceResult;
 import com.acme.fabric.domain.FabricModels.PipelineRequest;
@@ -46,6 +47,7 @@ import com.acme.fabric.domain.FabricModels.StagedAssetResponse;
 import com.acme.fabric.domain.FabricModels.StagedFileMetadata;
 import com.acme.fabric.domain.FabricModels.TelnetCommandPayload;
 import com.acme.fabric.domain.FabricModels.TelnetCommandResponse;
+import com.acme.fabric.provisioning.LocalVmService;
 import com.acme.fabric.stream.FabricEventBus;
 
 import org.springframework.stereotype.Component;
@@ -57,6 +59,7 @@ import reactor.core.publisher.Mono;
 @Component
 public class ControlPlaneHandler {
     private final FabricEventBus eventBus;
+    private final LocalVmService localVmService;
     private final CopyOnWriteArrayList<FirewallRuleEntity> firewallRules = new CopyOnWriteArrayList<>(List.of(
             new FirewallRuleEntity("10.0.0.0/8", "23/TCP", "DROP"),
             new FirewallRuleEntity("192.168.1.0/24", "22/TCP", "ACCEPT")
@@ -65,8 +68,9 @@ public class ControlPlaneHandler {
             new HoneypotIncidentRecord(UUID.randomUUID().toString(), "185.220.101.4", "Legacy Telnet Root Prompt", 23, Instant.now())
     ));
 
-    public ControlPlaneHandler(FabricEventBus eventBus) {
+    public ControlPlaneHandler(FabricEventBus eventBus, LocalVmService localVmService) {
         this.eventBus = eventBus;
+        this.localVmService = localVmService;
     }
 
     public Mono<ServerResponse> provisionServer(ServerRequest request) {
@@ -127,6 +131,16 @@ public class ControlPlaneHandler {
                 List.of("Ollama CPU inference can spike during remediation; keep rule-based fallback enabled.")
         );
         return ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(overview);
+    }
+
+    public Mono<ServerResponse> localVmProviders(ServerRequest request) {
+        return ServerResponse.ok().contentType(APPLICATION_JSON).body(localVmService.providers(), Object.class);
+    }
+
+    public Mono<ServerResponse> createLocalVm(ServerRequest request) {
+        return request.bodyToMono(LocalVmCreateRequest.class)
+                .flatMap(localVmService::create)
+                .flatMap(response -> ServerResponse.status(ACCEPTED).contentType(APPLICATION_JSON).bodyValue(response));
     }
 
     public Mono<ServerResponse> aiGuide(ServerRequest request) {

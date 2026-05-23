@@ -732,6 +732,26 @@ textarea {
   gap: 14px;
 }
 
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: none;
+}
+
+.checkbox-line input {
+  width: auto;
+}
+
 .endpoint-line {
   display: flex;
   align-items: center;
