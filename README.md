@@ -37,6 +37,34 @@ Services:
 Spring AI auto-pulls `llama3.2:3b` and `nomic-embed-text` when missing. Override with `OLLAMA_CHAT_MODEL` and `OLLAMA_EMBEDDING_MODEL`.
 Database schema is created at backend startup by Flyway migrations in `backend/src/main/resources/db/migration`. Docker Compose uses Postgres with R2DBC for app access and JDBC/Flyway for migrations.
 
+## Real Local VM Creation
+
+Docker mode is intentionally guarded. It can generate VMware/QEMU plans, but real VM creation requires control of the physical system where VMware Fusion/Workstation or QEMU is installed. Run the backend directly on that host terminal and explicitly enable execution:
+
+macOS/Linux:
+
+```bash
+chmod +x scripts/run-local-vm-host.sh
+REACTOR_VM_EXECUTION_ENABLED=true scripts/run-local-vm-host.sh
+```
+
+Windows PowerShell:
+
+```powershell
+$env:REACTOR_VM_EXECUTION_ENABLED="true"
+.\scripts\run-local-vm-host.ps1
+```
+
+Useful environment variables:
+
+- `REACTOR_VM_ROOT`: where VM files are created, for example `/Users/ajay/ReactorVMs`.
+- `REACTOR_VMRUN_BINARY`: path to VMware `vmrun`.
+- `REACTOR_VMWARE_DISKMANAGER_BINARY`: path to `vmware-vdiskmanager`.
+- `REACTOR_QEMU_IMG_BINARY`: path to `qemu-img`.
+- `REACTOR_QEMU_SYSTEM_BINARY`: path to `qemu-system-x86_64`.
+
+Real VMware creation writes a `.vmx` and creates a `.vmdk` using `vmware-vdiskmanager`; if `startAfterCreate=true`, Reactor starts it with `vmrun`. Real QEMU creation writes a `.qcow2`; if `startAfterCreate=true`, Reactor starts QEMU detached and writes `qemu.log` beside the VM disk. Review the generated command plan in the Local VM Workstation before enabling real execution.
+
 ## Public Hosting
 
 This repository includes `render.yaml` for a GitHub-connected Render Blueprint:

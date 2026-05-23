@@ -1205,7 +1205,7 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
           <div class="panel-title-row">
             <div>
               <h3>VMware-Style Local VM Creator</h3>
-              <p class="muted">Creates VM plans for your physical system using VMware vmrun or QEMU. Real execution is guarded by REACTOR_VM_EXECUTION_ENABLED.</p>
+              <p class="muted">Creates real VMware/QEMU VM plans. To control your physical system, run the backend on that host terminal with REACTOR_VM_EXECUTION_ENABLED=true after reviewing the generated commands.</p>
             </div>
             <span class="status-chip">Guarded Executor</span>
           </div>
@@ -1243,7 +1243,7 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
 
           <section class="panel">
             <h3>Execution Plan</h3>
-            <pre class="console-frame">{{ localVmResult ? JSON.stringify(localVmResult, null, 2) : 'Submit the form to generate VMware/QEMU commands. By default Reactor returns a dry-run plan so your physical machine is not changed without explicit enablement.' }}</pre>
+            <pre class="console-frame">{{ localVmResult ? JSON.stringify(localVmResult, null, 2) : 'Submit the form to generate VMware/QEMU commands. Docker mode is dry-run by default. For real creation, run scripts/run-local-vm-host.sh or scripts/run-local-vm-host.ps1 on the physical machine, enable REACTOR_VM_EXECUTION_ENABLED=true, then approve the command plan.' }}</pre>
           </section>
         </section>
       </section>
