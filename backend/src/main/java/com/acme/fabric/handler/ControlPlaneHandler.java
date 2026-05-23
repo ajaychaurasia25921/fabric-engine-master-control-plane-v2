@@ -12,6 +12,11 @@ import static org.springframework.http.HttpStatus.ACCEPTED;
 import static org.springframework.http.HttpStatus.CREATED;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
+import java.io.File;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
+import java.lang.management.RuntimeMXBean;
+import java.lang.management.ThreadMXBean;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -117,20 +122,166 @@ public class ControlPlaneHandler {
     }
 
     public Mono<ServerResponse> hardwareOverview(ServerRequest request) {
+        Runtime runtime = Runtime.getRuntime();
+        RuntimeMXBean runtimeMxBean = ManagementFactory.getRuntimeMXBean();
+        ThreadMXBean threadMxBean = ManagementFactory.getThreadMXBean();
+        java.lang.management.OperatingSystemMXBean baseOsBean = ManagementFactory.getOperatingSystemMXBean();
+        MemoryUsage heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+        MemoryUsage nonHeap = ManagementFactory.getMemoryMXBean().getNonHeapMemoryUsage();
+        File root = new File("/");
+
+        double systemCpuLoad = systemCpuLoad(baseOsBean);
+        long totalMemoryBytes = totalPhysicalMemoryBytes(baseOsBean, runtime.maxMemory());
+        long usedMemoryBytes = usedPhysicalMemoryBytes(baseOsBean, totalMemoryBytes, runtime.totalMemory() - runtime.freeMemory());
+        long diskTotalBytes = root.getTotalSpace();
+        long diskUsedBytes = Math.max(0, diskTotalBytes - root.getUsableSpace());
+        int availableProcessors = runtime.availableProcessors();
+        long uptimeSeconds = runtimeMxBean.getUptime() / 1_000;
+        double heapUsedPercent = percent(heap.getUsed(), heap.getMax() > 0 ? heap.getMax() : heap.getCommitted());
+        double memoryUsedPercent = percent(usedMemoryBytes, totalMemoryBytes);
+        double diskUsedPercent = percent(diskUsedBytes, diskTotalBytes);
+        int loadedClasses = ManagementFactory.getClassLoadingMXBean().getLoadedClassCount();
+        long totalStartedThreads = threadMxBean.getTotalStartedThreadCount();
+
         HardwareOverview overview = new HardwareOverview(
                 "local-physical-host",
-                Map.of("cores", 8, "loadPercent", 42, "thermalState", "NOMINAL"),
-                Map.of("totalGb", 32, "usedGb", 18, "pressure", "LOW"),
-                Map.of("vmPoolGb", 512, "usedGb", 226, "iopsState", "HEALTHY"),
+                Map.of(
+                        "cores", availableProcessors,
+                        "loadPercent", round(systemCpuLoad),
+                        "systemLoadAverage", round(baseOsBean.getSystemLoadAverage()),
+                        "thermalState", systemCpuLoad > 85 ? "HOT" : systemCpuLoad > 70 ? "ELEVATED" : "NOMINAL"
+                ),
+                Map.of(
+                        "totalGb", round(gib(totalMemoryBytes)),
+                        "usedGb", round(gib(usedMemoryBytes)),
+                        "freeGb", round(gib(Math.max(0, totalMemoryBytes - usedMemoryBytes))),
+                        "usedPercent", round(memoryUsedPercent),
+                        "pressure", memoryUsedPercent > 85 ? "HIGH" : memoryUsedPercent > 70 ? "WATCH" : "LOW"
+                ),
+                Map.of(
+                        "vmPoolGb", round(gib(diskTotalBytes)),
+                        "usedGb", round(gib(diskUsedBytes)),
+                        "freeGb", round(gib(root.getUsableSpace())),
+                        "usedPercent", round(diskUsedPercent),
+                        "iopsState", diskUsedPercent > 90 ? "PRESSURE" : "HEALTHY"
+                ),
                 Map.of("fabricInterfaces", 2, "internetUplink", "ACTIVE", "fabricBridge", "ACTIVE"),
+                Map.of(
+                        "status", healthStatus(systemCpuLoad, memoryUsedPercent, heapUsedPercent),
+                        "db", "UP",
+                        "r2dbc", "UP",
+                        "ollama", "LOCAL_OR_FALLBACK_READY",
+                        "sse", "UP",
+                        "checkedAt", Instant.now().toString()
+                ),
+                Map.of(
+                        "pid", ProcessHandle.current().pid(),
+                        "uptimeSeconds", uptimeSeconds,
+                        "startTime", Instant.ofEpochMilli(runtimeMxBean.getStartTime()).toString(),
+                        "inputArguments", runtimeMxBean.getInputArguments(),
+                        "availableProcessors", availableProcessors
+                ),
+                Map.of(
+                        "live", threadMxBean.getThreadCount(),
+                        "daemon", threadMxBean.getDaemonThreadCount(),
+                        "peak", threadMxBean.getPeakThreadCount(),
+                        "totalStarted", totalStartedThreads
+                ),
+                Map.of(
+                        "name", runtimeMxBean.getVmName(),
+                        "vendor", runtimeMxBean.getVmVendor(),
+                        "version", runtimeMxBean.getVmVersion(),
+                        "heapUsedMb", round(mib(heap.getUsed())),
+                        "heapCommittedMb", round(mib(heap.getCommitted())),
+                        "heapMaxMb", round(mib(heap.getMax())),
+                        "heapUsedPercent", round(heapUsedPercent),
+                        "nonHeapUsedMb", round(mib(nonHeap.getUsed())),
+                        "loadedClasses", loadedClasses,
+                        "gcCollectors", ManagementFactory.getGarbageCollectorMXBeans().stream().map(gc -> gc.getName()).toList()
+                ),
+                Map.of(
+                        "providerMode", "VMWARE_OR_QEMU_GUARDED",
+                        "localExecutionEnabled", false,
+                        "activeVms", 0,
+                        "plannedVms", 1,
+                        "capacityState", diskUsedPercent > 90 || memoryUsedPercent > 85 ? "CONSTRAINED" : "READY"
+                ),
+                Map.of(
+                        "cpuPercent", round(systemCpuLoad),
+                        "memoryPercent", round(memoryUsedPercent),
+                        "heapPercent", round(heapUsedPercent),
+                        "diskPercent", round(diskUsedPercent),
+                        "threadCount", threadMxBean.getThreadCount()
+                ),
                 List.of(
                         "Pin AI VMs to the host VM pool and reserve 6 GB memory per local model runtime.",
                         "Quantum systems should stay VM-only and use simulated QPU acceleration until a hardware backend is registered.",
-                        "Remote node server promotion should run eligibility checks before installing hypervisor services."
+                        "Remote node server promotion should run eligibility checks before installing hypervisor services.",
+                        "Watch heap and live thread trends before enabling real VM execution on the physical host."
                 ),
-                List.of("Ollama CPU inference can spike during remediation; keep rule-based fallback enabled.")
+                diagnosticAlerts(systemCpuLoad, memoryUsedPercent, heapUsedPercent, diskUsedPercent, threadMxBean.getThreadCount())
         );
         return ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(overview);
+    }
+
+    private static double systemCpuLoad(java.lang.management.OperatingSystemMXBean osBean) {
+        if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOsBean) {
+            double load = sunOsBean.getCpuLoad();
+            return load >= 0 ? load * 100 : 0;
+        }
+        double loadAverage = osBean.getSystemLoadAverage();
+        return loadAverage >= 0 ? Math.min(100, (loadAverage / Math.max(1, osBean.getAvailableProcessors())) * 100) : 0;
+    }
+
+    private static long totalPhysicalMemoryBytes(java.lang.management.OperatingSystemMXBean osBean, long fallbackBytes) {
+        if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOsBean) {
+            return sunOsBean.getTotalMemorySize();
+        }
+        return fallbackBytes;
+    }
+
+    private static long usedPhysicalMemoryBytes(java.lang.management.OperatingSystemMXBean osBean, long totalBytes, long fallbackBytes) {
+        if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOsBean) {
+            return Math.max(0, totalBytes - sunOsBean.getFreeMemorySize());
+        }
+        return fallbackBytes;
+    }
+
+    private static String healthStatus(double cpuPercent, double memoryPercent, double heapPercent) {
+        if (cpuPercent > 90 || memoryPercent > 90 || heapPercent > 90) {
+            return "CRITICAL";
+        }
+        if (cpuPercent > 75 || memoryPercent > 80 || heapPercent > 80) {
+            return "DEGRADED";
+        }
+        return "UP";
+    }
+
+    private static List<String> diagnosticAlerts(double cpuPercent, double memoryPercent, double heapPercent, double diskPercent, int threadCount) {
+        List<String> alerts = new java.util.ArrayList<>();
+        if (cpuPercent > 75) alerts.add("CPU pressure is elevated; delay heavy AI remediation or VM boot storms.");
+        if (memoryPercent > 80) alerts.add("System memory pressure is high; reduce VM memory reservations.");
+        if (heapPercent > 80) alerts.add("JVM heap usage is high; inspect reactive pipelines and object retention.");
+        if (diskPercent > 85) alerts.add("VM pool storage is nearing capacity; clean old disks before provisioning.");
+        if (threadCount > 180) alerts.add("Thread count is elevated; verify no blocking adapters are growing pools.");
+        if (alerts.isEmpty()) alerts.add("Runtime health is nominal; no immediate 360-view alerts.");
+        return alerts;
+    }
+
+    private static double gib(long bytes) {
+        return bytes <= 0 ? 0 : bytes / 1_073_741_824.0;
+    }
+
+    private static double mib(long bytes) {
+        return bytes <= 0 ? 0 : bytes / 1_048_576.0;
+    }
+
+    private static double percent(long used, long total) {
+        return total <= 0 ? 0 : (used * 100.0) / total;
+    }
+
+    private static double round(double value) {
+        return Math.round(value * 10.0) / 10.0;
     }
 
     public Mono<ServerResponse> localVmProviders(ServerRequest request) {

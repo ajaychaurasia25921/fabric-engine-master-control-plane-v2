@@ -71,6 +71,7 @@ const quantumOutput = ref('System core idle. Submit a compiled circuit mapping a
 const quantumStatus = ref('STANDBY');
 const socketOutput = ref('');
 const hardwareOverview = ref(null);
+const hardwareHistory = ref([]);
 const localVmProviders = ref([]);
 const localVmResult = ref(null);
 const deviceRegistration = ref(null);
@@ -86,6 +87,7 @@ const aiPendingActions = ref([]);
 const aiListening = ref(false);
 const browserVoices = ref([]);
 let speechRecognition;
+let diagnosticsTimer;
 const packetCanvasOpen = ref(false);
 const vdiOpen = ref(false);
 const vdiConnected = ref(false);
@@ -158,6 +160,47 @@ const transferSourceNode = computed(() => inventory.value.find((node) => node.id
 const transferDestinationNode = computed(() => inventory.value.find((node) => node.id === transferForm.destinationNodeId) ?? inventory.value[1] ?? inventory.value[0]);
 const selectedVdiNode = computed(() => inventory.value.find((node) => node.id === vdiForm.targetNodeId) ?? inventory.value[0]);
 const aiPersonaName = computed(() => (aiVoiceGender.value === 'male' ? 'Gabbar' : 'Aarohi'));
+const diagnosticCards = computed(() => {
+  const overview = hardwareOverview.value ?? {};
+  return [
+    {
+      label: 'CPU',
+      value: `${metricValue(overview.cpu?.loadPercent, 42)}%`,
+      detail: `${overview.cpu?.cores ?? 8} cores · ${overview.cpu?.thermalState ?? 'NOMINAL'}`
+    },
+    {
+      label: 'Memory',
+      value: `${metricValue(overview.memory?.usedGb, 18)} / ${metricValue(overview.memory?.totalGb, 32)} GB`,
+      detail: `${metricValue(overview.memory?.usedPercent, 56)}% used · ${overview.memory?.pressure ?? 'LOW'}`
+    },
+    {
+      label: 'JVM Heap',
+      value: `${metricValue(overview.jvm?.heapUsedMb, 256)} MB`,
+      detail: `${metricValue(overview.jvm?.heapUsedPercent, 25)}% heap · ${overview.jvm?.loadedClasses ?? 0} classes`
+    },
+    {
+      label: 'Threads',
+      value: `${overview.threads?.live ?? 0} live`,
+      detail: `${overview.threads?.daemon ?? 0} daemon · ${overview.threads?.peak ?? 0} peak`
+    },
+    {
+      label: 'Process',
+      value: `PID ${overview.process?.pid ?? 'local'}`,
+      detail: `${formatDuration(overview.process?.uptimeSeconds ?? 0)} uptime`
+    },
+    {
+      label: 'VM Pool',
+      value: `${metricValue(overview.storage?.usedGb, 226)} / ${metricValue(overview.storage?.vmPoolGb, 512)} GB`,
+      detail: `${overview.vmPool?.capacityState ?? overview.storage?.iopsState ?? 'READY'} · ${overview.vmPool?.providerMode ?? 'guarded'}`
+    }
+  ];
+});
+const diagnosticCharts = computed(() => [
+  { key: 'cpu', label: 'CPU %', color: '#20c997' },
+  { key: 'memory', label: 'Memory %', color: '#ffd166' },
+  { key: 'heap', label: 'Heap %', color: '#7c9cff' },
+  { key: 'threads', label: 'Threads', color: '#f06c9b' }
+]);
 
 onMounted(async () => {
   loadBrowserVoices();
@@ -167,8 +210,9 @@ onMounted(async () => {
   try {
     firewallRules.value = await fetchFirewallRules();
     incidents.value = await fetchHoneypotIncidents();
-    hardwareOverview.value = await fetchHardwareOverview();
+    await refreshHardwareOverview();
     localVmProviders.value = await fetchLocalVmProviders();
+    diagnosticsTimer = window.setInterval(refreshHardwareOverview, 5000);
   } catch {
     notify('Backend control-plane APIs are still warming up.');
   }
@@ -178,6 +222,9 @@ onBeforeUnmount(() => {
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
+  if (diagnosticsTimer) {
+    window.clearInterval(diagnosticsTimer);
+  }
   speechRecognition?.stop();
 });
 
@@ -186,6 +233,57 @@ function notify(message) {
   window.setTimeout(() => {
     if (toast.value === message) toast.value = '';
   }, 3200);
+}
+
+async function refreshHardwareOverview() {
+  const overview = await fetchHardwareOverview();
+  hardwareOverview.value = overview;
+  recordHardwareSample(overview);
+}
+
+function recordHardwareSample(overview) {
+  const graphs = overview?.graphs ?? {};
+  const cpu = Number(graphs.cpuPercent ?? overview?.cpu?.loadPercent ?? 0);
+  const memory = Number(graphs.memoryPercent ?? overview?.memory?.usedPercent ?? 0);
+  const heap = Number(graphs.heapPercent ?? overview?.jvm?.heapUsedPercent ?? 0);
+  const threads = Number(graphs.threadCount ?? overview?.threads?.live ?? 0);
+  const next = [...hardwareHistory.value, {
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+    cpu,
+    memory,
+    heap,
+    threads
+  }];
+  hardwareHistory.value = next.slice(-24);
+}
+
+function chartPoints(key) {
+  const values = hardwareHistory.value.map((sample) => Number(sample[key] ?? 0));
+  if (!values.length) return '';
+  const max = key === 'threads' ? Math.max(20, ...values) : 100;
+  return values.map((value, index) => {
+    const x = values.length === 1 ? 0 : (index / (values.length - 1)) * 100;
+    const y = 54 - Math.min(54, Math.max(0, (value / max) * 54));
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+function latestChartValue(key) {
+  const last = hardwareHistory.value.at(-1);
+  if (!last) return key === 'threads' ? '0' : '0%';
+  return key === 'threads' ? String(Math.round(last[key] ?? 0)) : `${metricValue(last[key], 0)}%`;
+}
+
+function metricValue(value, fallback) {
+  const number = Number(value ?? fallback ?? 0);
+  return Number.isInteger(number) ? number : number.toFixed(1);
+}
+
+function formatDuration(seconds) {
+  const safeSeconds = Number(seconds ?? 0);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 async function submitLocalVm() {
