@@ -78,15 +78,20 @@ const deviceRegistration = ref(null);
 const aiGuideOpen = ref(true);
 const aiGuideInput = ref('How do I provision an AI VM and register it on the fabric?');
 const aiGuideMessages = ref([
-  { role: 'guide', text: 'Aarohi online. I can speak, listen, understand multilingual instructions, and propose Reactor actions for your approval.' }
+  { role: 'guide', text: 'Namaste, Aarohi here. Main aapki Reactor guide hoon. Aap Hindi, English, ya Hinglish mein bol sakte ho; main dhyaan se sunungi, samjhaungi, aur koi bhi action lene se pehle approval maangungi.' }
 ]);
 const aiVoiceEnabled = ref(true);
 const aiVoiceGender = ref('female');
 const aiLanguage = ref('auto');
 const aiPendingActions = ref([]);
 const aiListening = ref(false);
+const aiVoiceMode = ref('natural');
+const aiInterimTranscript = ref('');
+const aiGuideStatus = ref('Ready to listen');
 const browserVoices = ref([]);
 let speechRecognition;
+let speechRestartTimer;
+let speakingUtterances = [];
 let diagnosticsTimer;
 const packetCanvasOpen = ref(false);
 const vdiOpen = ref(false);
@@ -222,8 +227,12 @@ onBeforeUnmount(() => {
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
+  speakingUtterances = [];
   if (diagnosticsTimer) {
     window.clearInterval(diagnosticsTimer);
+  }
+  if (speechRestartTimer) {
+    window.clearTimeout(speechRestartTimer);
   }
   speechRecognition?.stop();
 });
@@ -391,50 +400,155 @@ function loadBrowserVoices() {
 }
 
 function preferredVoice() {
-  const voices = browserVoices.value.filter((voice) => voice.lang?.toLowerCase().startsWith('en'));
-  const maleHints = ['male', 'ravi', 'daniel', 'alex', 'fred', 'david', 'mark', 'george', 'arthur'];
-  const femaleHints = ['female', 'veena', 'samantha', 'victoria', 'karen', 'susan', 'zira', 'sara', 'ava'];
+  const voices = browserVoices.value;
+  const preferredLangs = aiLanguage.value === 'hi-IN'
+    ? ['hi-in', 'hi']
+    : aiLanguage.value === 'en-US'
+      ? ['en-us', 'en']
+      : ['en-in', 'hi-in', 'en', 'hi'];
+  const languageVoices = voices.filter((voice) => preferredLangs.some((lang) => voice.lang?.toLowerCase().startsWith(lang)));
+  const maleHints = ['ravi', 'male', 'amit', 'raj', 'daniel', 'alex', 'fred', 'david', 'mark', 'george', 'arthur'];
+  const femaleHints = ['veena', 'female', 'lekha', 'heera', 'samantha', 'victoria', 'karen', 'susan', 'zira', 'sara', 'ava'];
   const hints = aiVoiceGender.value === 'male' ? maleHints : femaleHints;
-  return voices.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint)))
-    ?? voices[0]
-    ?? browserVoices.value[0];
+  return languageVoices.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint)))
+    ?? languageVoices[0]
+    ?? voices.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint)))
+    ?? voices[0];
 }
 
 function speakGuideResponse(text) {
   if (!aiVoiceEnabled.value || typeof window === 'undefined' || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.voice = preferredVoice();
-  utterance.rate = 0.95;
-  utterance.pitch = aiVoiceGender.value === 'male' ? 0.86 : 1.08;
+  speakingUtterances = buildSpeechChunks(text).map((chunk) => {
+    const utterance = new SpeechSynthesisUtterance(chunk);
+    utterance.voice = preferredVoice();
+    utterance.lang = speechLanguage();
+    utterance.rate = aiVoiceMode.value === 'natural' ? 0.88 : 0.98;
+    utterance.pitch = aiVoiceGender.value === 'male' ? 0.82 : 1.05;
+    utterance.volume = 1;
+    return utterance;
+  });
+  speakNextChunk();
+}
+
+function buildSpeechChunks(text) {
+  const cleanText = humanizeGuideText(text);
+  const sentences = cleanText.match(/[^.!?।]+[.!?।]?/g) ?? [cleanText];
+  const chunks = [];
+  let current = '';
+  sentences.forEach((sentence) => {
+    const next = `${current} ${sentence}`.trim();
+    if (next.length > 180 && current) {
+      chunks.push(current);
+      current = sentence.trim();
+    } else {
+      current = next;
+    }
+  });
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+function humanizeGuideText(text) {
+  const prefix = aiLanguage.value === 'hi-IN'
+    ? `${aiPersonaName.value}: theek hai, suno. `
+    : `${aiPersonaName.value}: alright, I am with you. `;
+  return text.startsWith(aiPersonaName.value) ? text : `${prefix}${text}`;
+}
+
+function speakNextChunk() {
+  const utterance = speakingUtterances.shift();
+  if (!utterance || typeof window === 'undefined' || !window.speechSynthesis) {
+    aiGuideStatus.value = aiListening.value ? 'Listening continuously' : 'Ready to listen';
+    return;
+  }
+  aiGuideStatus.value = `${aiPersonaName.value} speaking`;
+  utterance.onend = () => window.setTimeout(speakNextChunk, 120);
+  utterance.onerror = () => {
+    aiGuideStatus.value = 'Voice output paused';
+  };
   window.speechSynthesis.speak(utterance);
 }
 
+function speechLanguage() {
+  if (aiLanguage.value === 'hi-IN') return 'hi-IN';
+  if (aiLanguage.value === 'en-US') return 'en-US';
+  return 'en-IN';
+}
+
 function startVoiceInput() {
+  if (aiListening.value) {
+    stopVoiceInput();
+    return;
+  }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
     notify('Speech input is not supported in this browser.');
     return;
   }
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+  aiGuideStatus.value = 'Listening continuously';
+  aiInterimTranscript.value = '';
+  beginRecognition(Recognition);
+}
+
+function beginRecognition(Recognition) {
   speechRecognition?.stop();
   speechRecognition = new Recognition();
-  speechRecognition.lang = aiLanguage.value === 'hi-IN' ? 'hi-IN' : aiLanguage.value === 'en-IN' || aiLanguage.value === 'auto' ? 'en-IN' : aiLanguage.value;
-  speechRecognition.interimResults = false;
-  speechRecognition.continuous = false;
+  speechRecognition.lang = speechLanguage();
+  speechRecognition.interimResults = true;
+  speechRecognition.continuous = true;
+  speechRecognition.maxAlternatives = 3;
   speechRecognition.onstart = () => {
     aiListening.value = true;
+    aiGuideStatus.value = 'Listening continuously';
   };
   speechRecognition.onend = () => {
-    aiListening.value = false;
+    if (aiListening.value) {
+      speechRestartTimer = window.setTimeout(() => beginRecognition(Recognition), 350);
+    } else {
+      aiGuideStatus.value = 'Ready to listen';
+    }
   };
-  speechRecognition.onerror = () => {
+  speechRecognition.onerror = (event) => {
+    if (event.error === 'no-speech') {
+      aiGuideStatus.value = 'Still listening, please continue';
+      return;
+    }
     aiListening.value = false;
+    aiGuideStatus.value = 'Voice capture stopped';
     notify('Voice capture stopped. Check microphone permission.');
   };
   speechRecognition.onresult = (event) => {
-    aiGuideInput.value = event.results?.[0]?.[0]?.transcript ?? aiGuideInput.value;
+    let finalTranscript = '';
+    let interimTranscript = '';
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index]?.[0]?.transcript ?? '';
+      if (event.results[index].isFinal) {
+        finalTranscript += transcript;
+      } else {
+        interimTranscript += transcript;
+      }
+    }
+    if (finalTranscript.trim()) {
+      aiGuideInput.value = `${aiGuideInput.value} ${finalTranscript}`.trim();
+      aiGuideStatus.value = 'Captured voice. Keep speaking or press Send.';
+    }
+    aiInterimTranscript.value = interimTranscript.trim();
   };
   speechRecognition.start();
+}
+
+function stopVoiceInput() {
+  aiListening.value = false;
+  aiGuideStatus.value = 'Ready to listen';
+  aiInterimTranscript.value = '';
+  if (speechRestartTimer) {
+    window.clearTimeout(speechRestartTimer);
+  }
+  speechRecognition?.stop();
 }
 
 function approveAgentAction(action) {
@@ -1232,7 +1346,17 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
               <option :value="false">Off</option>
             </select>
           </label>
-          <button type="button" @click="startVoiceInput">{{ aiListening ? 'Listening...' : 'Speak' }}</button>
+          <label>Voice Style
+            <select v-model="aiVoiceMode">
+              <option value="natural">Natural Guide</option>
+              <option value="fast">Fast Brief</option>
+            </select>
+          </label>
+          <button type="button" :class="{ listening: aiListening }" @click="startVoiceInput">{{ aiListening ? 'Stop Listening' : 'Speak' }}</button>
+        </div>
+        <div class="voice-status">
+          <span>{{ aiGuideStatus }}</span>
+          <small v-if="aiInterimTranscript">{{ aiInterimTranscript }}</small>
         </div>
         <div class="guide-messages">
           <article v-for="(message, index) in aiGuideMessages" :key="index" :class="message.role">

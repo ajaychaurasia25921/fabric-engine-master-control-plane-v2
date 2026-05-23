@@ -466,8 +466,21 @@ public class ControlPlaneHandler {
     private String aiGuideText(AiGuidePrompt prompt) {
         String persona = prompt.persona() == null ? "Aarohi" : prompt.persona();
         String language = prompt.language() == null ? "auto" : prompt.language();
-        return persona + " online. I can understand multilingual operator intent, explain the plan in " + language
-                + ", and prepare actions only after your approval. I will never change Reactor state without asking you first. Your request was: "
-                + prompt.message();
+        String message = prompt.message() == null ? "" : prompt.message();
+        if ("hi-IN".equals(language) || message.matches(".*[\\u0900-\\u097F].*")) {
+            return persona + " bol rahi hoon. Theek hai, maine aapki baat dhyaan se samajh li: " + message
+                    + ". Main pehle simple Hindi-Hinglish mein plan bataungi, phir action ka proposal dungi. "
+                    + "Aapke approve kiye bina main VM, server, packet route, ya security policy mein koi change nahi karungi. "
+                    + "Abhi safest next step hai 360 View mein CPU, memory, JVM heap, threads aur VM pool pressure dekhna, "
+                    + "phir jis node par kaam karna hai uska exact naam bol dijiye.";
+        }
+        if ("en-IN".equals(language) || "auto".equals(language)) {
+            return persona + " here. Haan, I understood you. You said: " + message
+                    + ". I will guide you step by step in natural Indian English or Hinglish, keep the risk visible, "
+                    + "and ask before I touch Reactor state. For this request, I would first check 360 health, "
+                    + "confirm the target node or VM, then prepare the action for your approval.";
+        }
+        return persona + " here. I understood your request: " + message
+                + ". I will explain the plan clearly, keep decisions under your approval, and prepare safe next actions only after you confirm.";
     }
 }
