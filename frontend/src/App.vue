@@ -22,20 +22,45 @@ import FabricCanvas from './components/FabricCanvas.vue';
 import PlatformFunctionsPanel from './components/PlatformFunctionsPanel.vue';
 import SmsDispatchPanel from './components/SmsDispatchPanel.vue';
 
-const tabs = [
-  ['dashboard', 'Main Dashboard'],
-  ['360-view', '360 View'],
-  ['servers', 'Enterprise Provisioning'],
-  ['local-vms', 'Local VM Workstation'],
-  ['sms-gateway', 'SMS Gateway Hub'],
-  ['terminal-access', 'SSH / Telnet Terminals'],
-  ['security-plane', 'Firewall & Honeypots'],
-  ['packet-tracing', 'CCNP Packet Tracing'],
-  ['file-transport', 'File Transport Plane'],
-  ['quantum', 'Quantum Core'],
-  ['networking', 'L7 Sockets'],
-  ['polyglot-functions', 'Polyglot Functions'],
-  ['about', 'About Reactor']
+const navGroups = [
+  {
+    label: 'Overview',
+    tabs: [
+      ['dashboard', 'Main Dashboard'],
+      ['360-view', '360 View']
+    ]
+  },
+  {
+    label: 'Infrastructure',
+    tabs: [
+      ['servers', 'Enterprise Provisioning'],
+      ['local-vms', 'Local VM Workstation'],
+      ['terminal-access', 'SSH / Telnet Terminals']
+    ]
+  },
+  {
+    label: 'Network & Security',
+    tabs: [
+      ['security-plane', 'Firewall & Honeypots'],
+      ['packet-tracing', 'CCNP Packet Tracing'],
+      ['file-transport', 'File Transport Plane'],
+      ['networking', 'L7 Sockets']
+    ]
+  },
+  {
+    label: 'Automation',
+    tabs: [
+      ['sms-gateway', 'SMS Gateway Hub'],
+      ['quantum', 'Quantum Core'],
+      ['polyglot-functions', 'Polyglot Functions']
+    ]
+  },
+  {
+    label: 'Product',
+    tabs: [
+      ['about', 'About Reactor']
+    ]
+  }
 ];
 
 const tabCopy = {
@@ -853,14 +878,17 @@ function handleVdiCommand() {
         </div>
 
         <nav class="nav-list">
-          <button
-            v-for="[id, label] in tabs"
-            :key="id"
-            :class="['nav-button', { active: activeTab === id }]"
-            @click="activeTab = id"
-          >
-            {{ label }}
-          </button>
+          <section v-for="group in navGroups" :key="group.label" class="nav-group">
+            <h2>{{ group.label }}</h2>
+            <button
+              v-for="[id, label] in group.tabs"
+              :key="id"
+              :class="['nav-button', { active: activeTab === id }]"
+              @click="activeTab = id"
+            >
+              {{ label }}
+            </button>
+          </section>
         </nav>
       </div>
 

@@ -115,7 +115,26 @@ button {
 }
 
 .nav-list {
+  gap: 14px;
+  max-height: calc(100vh - 330px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.nav-group {
+  display: grid;
   gap: 4px;
+}
+
+.nav-group h2 {
+  margin: 0 0 3px;
+  padding: 0 12px;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .nav-button,
@@ -1564,21 +1583,43 @@ textarea {
 }
 
 :root[data-theme="light"] .nav-button,
+:root[data-theme="light"] .nav-group h2,
 :root[data-theme="light"] .muted,
 :root[data-theme="light"] .brand-block p,
+:root[data-theme="light"] .topbar p,
+:root[data-theme="light"] .nav-footer label,
+:root[data-theme="light"] .form-grid label,
+:root[data-theme="light"] .webhook-row label,
 :root[data-theme="light"] .properties-panel p,
 :root[data-theme="light"] .hardware-grid small,
 :root[data-theme="light"] .metric-chart small,
-:root[data-theme="light"] .packet-palette button span {
+:root[data-theme="light"] .packet-palette button span,
+:root[data-theme="light"] .event-row span,
+:root[data-theme="light"] .event-row p,
+:root[data-theme="light"] .event-row small,
+:root[data-theme="light"] .dropzone span,
+:root[data-theme="light"] .hop-row span,
+:root[data-theme="light"] .guide-messages small,
+:root[data-theme="light"] .agent-actions span,
+:root[data-theme="light"] .vdi-picker label,
+:root[data-theme="light"] .vdi-desktop span {
   color: #475569;
 }
 
 :root[data-theme="light"] .panel h3,
 :root[data-theme="light"] .panel h4,
+:root[data-theme="light"] .topbar h2,
 :root[data-theme="light"] .properties-panel > strong,
 :root[data-theme="light"] .hardware-grid strong,
 :root[data-theme="light"] .metric-card strong,
-:root[data-theme="light"] .brand-block h1 {
+:root[data-theme="light"] .brand-block h1,
+:root[data-theme="light"] .event-row strong,
+:root[data-theme="light"] .guide-messages p,
+:root[data-theme="light"] .agent-actions b,
+:root[data-theme="light"] .chart-head strong,
+:root[data-theme="light"] .properties-panel dd,
+:root[data-theme="light"] .vdi-desktop article,
+:root[data-theme="light"] .file-button {
   color: #0f172a;
 }
 
@@ -1588,10 +1629,102 @@ textarea {
 :root[data-theme="light"] .packet-palette button,
 :root[data-theme="light"] .segmented button,
 :root[data-theme="light"] .status-chip,
-:root[data-theme="light"] .console-frame {
+:root[data-theme="light"] .console-frame,
+:root[data-theme="light"] .log-frame,
+:root[data-theme="light"] .event-row,
+:root[data-theme="light"] .dropzone,
+:root[data-theme="light"] .empty-state,
+:root[data-theme="light"] .file-button,
+:root[data-theme="light"] .metric-strip span,
+:root[data-theme="light"] .progress-track,
+:root[data-theme="light"] .guide-messages article,
+:root[data-theme="light"] .voice-status,
+:root[data-theme="light"] .guide-settings,
+:root[data-theme="light"] .agent-actions,
+:root[data-theme="light"] .agent-actions article,
+:root[data-theme="light"] .vdi-picker,
+:root[data-theme="light"] .vdi-desktop article,
+:root[data-theme="light"] .vdi-window header button,
+:root[data-theme="light"] .icon-action {
   color: #0f172a;
   border-color: #cbd5e1;
   background: #f8fafc;
+}
+
+:root[data-theme="light"] table {
+  color: #1e293b;
+}
+
+:root[data-theme="light"] th {
+  color: #334155;
+  background: #e2e8f0;
+}
+
+:root[data-theme="light"] td {
+  border-bottom-color: #cbd5e1;
+}
+
+:root[data-theme="light"] .panel-title-row,
+:root[data-theme="light"] .guide-panel header,
+:root[data-theme="light"] .guide-settings,
+:root[data-theme="light"] .guide-panel form,
+:root[data-theme="light"] .agent-actions {
+  border-color: #cbd5e1;
+}
+
+:root[data-theme="light"] .nav-button:hover,
+:root[data-theme="light"] .nav-button.active {
+  color: #ffffff;
+  background: #1d4ed8;
+}
+
+:root[data-theme="light"] .secondary-button {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+:root[data-theme="light"] .danger-button,
+:root[data-theme="light"] .icon-action.danger {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+:root[data-theme="light"] .utility-button {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+:root[data-theme="light"] .utility-button.amber,
+:root[data-theme="light"] .secondary-button.amber {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+:root[data-theme="light"] .status-chip.blue {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+:root[data-theme="light"] .status-chip.green {
+  color: #047857;
+  background: #d1fae5;
+}
+
+:root[data-theme="light"] .guide-messages article.user {
+  background: #dbeafe;
+}
+
+:root[data-theme="light"] .voice-status span,
+:root[data-theme="light"] .guide-panel header span,
+:root[data-theme="light"] .canvas-cli strong {
+  color: #0f766e;
+}
+
+:root[data-theme="light"] .vdi-window pre,
+:root[data-theme="light"] .vdi-input,
+:root[data-theme="light"] .canvas-cli pre {
+  color: #065f46;
+  background: #ecfdf5;
 }
 
 :root[data-theme="light"] .live-source {
