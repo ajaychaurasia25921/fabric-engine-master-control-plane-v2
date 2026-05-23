@@ -6,6 +6,11 @@
   text-rendering: optimizeLegibility;
 }
 
+:root[data-theme="light"] {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -15,6 +20,10 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: #020617;
+}
+
+:root[data-theme="light"] body {
+  background: #f8fafc;
 }
 
 button,
@@ -64,6 +73,12 @@ button {
   background: rgba(37, 99, 235, 0.12);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 900;
+}
+
+.brand-mark img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
 }
 
 .brand-block h1,
@@ -685,6 +700,14 @@ textarea {
   margin-top: 14px;
 }
 
+.live-source {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.64);
+}
+
 .metric-chart {
   border: 1px solid #1f2937;
   border-radius: 10px;
@@ -943,6 +966,23 @@ textarea {
   background: rgba(30, 64, 175, 0.28);
 }
 
+.tool-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tool-toggle button {
+  text-align: center;
+}
+
+.palette-hint {
+  margin: 0;
+  color: #fbbf24;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .packet-palette button span {
   color: #64748b;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -989,6 +1029,42 @@ textarea {
     linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
     #020617;
   background-size: 28px 28px;
+}
+
+.canvas-cli {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #1f2937;
+  padding-top: 12px;
+}
+
+.canvas-cli strong {
+  color: #99f6e4;
+  font-size: 12px;
+}
+
+.canvas-cli pre {
+  min-height: 150px;
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 10px;
+  color: #d1fae5;
+  background: #020617;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.canvas-cli label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 .modal-backdrop {
@@ -1464,6 +1540,70 @@ textarea {
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
+}
+
+:root[data-theme="light"] .nav-rail,
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .packet-palette,
+:root[data-theme="light"] .properties-panel,
+:root[data-theme="light"] .metric-card,
+:root[data-theme="light"] .hardware-grid article,
+:root[data-theme="light"] .metric-chart,
+:root[data-theme="light"] .guide-panel,
+:root[data-theme="light"] .vdi-window,
+:root[data-theme="light"] .canvas-cli pre {
+  color: #0f172a;
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+:root[data-theme="light"] .workspace,
+:root[data-theme="light"] .fabric-canvas,
+:root[data-theme="light"] .packet-workbench {
+  background: #f8fafc;
+}
+
+:root[data-theme="light"] .nav-button,
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] .brand-block p,
+:root[data-theme="light"] .properties-panel p,
+:root[data-theme="light"] .hardware-grid small,
+:root[data-theme="light"] .metric-chart small,
+:root[data-theme="light"] .packet-palette button span {
+  color: #475569;
+}
+
+:root[data-theme="light"] .panel h3,
+:root[data-theme="light"] .panel h4,
+:root[data-theme="light"] .properties-panel > strong,
+:root[data-theme="light"] .hardware-grid strong,
+:root[data-theme="light"] .metric-card strong,
+:root[data-theme="light"] .brand-block h1 {
+  color: #0f172a;
+}
+
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea,
+:root[data-theme="light"] .packet-palette button,
+:root[data-theme="light"] .segmented button,
+:root[data-theme="light"] .status-chip,
+:root[data-theme="light"] .console-frame {
+  color: #0f172a;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+:root[data-theme="light"] .live-source {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+:root[data-theme="light"] .fabric-canvas {
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px),
+    #ffffff;
 }
 
 @media (max-width: 1100px) {

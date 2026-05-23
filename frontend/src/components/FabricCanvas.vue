@@ -20,6 +20,11 @@ const designerNodes = ref([]);
 const designerEdges = ref([]);
 const selectedElement = ref(null);
 const activeWire = ref('ETHERNET');
+const canvasTool = ref('inspect');
+const pendingWireSource = ref(null);
+const cliNode = ref(null);
+const cliCommand = ref('');
+const cliOutput = ref([]);
 const isDesigner = computed(() => props.mode === 'designer');
 const canvasNodes = computed(() => (isDesigner.value ? designerNodes.value : vueFlowNodes.value));
 const canvasEdges = computed(() => (isDesigner.value ? designerEdges.value : vueFlowEdges.value));
@@ -110,11 +115,14 @@ function clearDesigner() {
   designerNodes.value = [];
   designerEdges.value = [];
   selectedElement.value = null;
+  pendingWireSource.value = null;
+  cliNode.value = null;
+  cliOutput.value = [];
 }
 
-function onConnect(connection) {
+function buildWireEdge(connection) {
   const wire = wirePalette.find((item) => item.type === activeWire.value) ?? wirePalette[0];
-  const edge = {
+  return {
     ...connection,
     id: `${connection.source}-${connection.target}-${Date.now()}`,
     label: wire.label,
@@ -128,6 +136,11 @@ function onConnect(connection) {
     style: { stroke: wire.stroke, strokeWidth: 3 },
     labelStyle: { fontWeight: 800, fill: '#e5e7eb' }
   };
+}
+
+function commitWire(connection) {
+  if (!connection.source || !connection.target || connection.source === connection.target) return;
+  const edge = buildWireEdge(connection);
   designerEdges.value = [...designerEdges.value, edge];
   addEdges([edge]);
   selectedElement.value = {
@@ -135,9 +148,27 @@ function onConnect(connection) {
     title: edge.label,
     metadata: edge.data
   };
+  pendingWireSource.value = null;
+}
+
+function onConnect(connection) {
+  commitWire(connection);
 }
 
 function onNodeClick({ node }) {
+  if (isDesigner.value && canvasTool.value === 'wire') {
+    if (!pendingWireSource.value) {
+      pendingWireSource.value = node;
+      selectedElement.value = {
+        type: 'device',
+        title: node.label,
+        metadata: { ...node.data, wireSource: 'selected' }
+      };
+      return;
+    }
+    commitWire({ source: pendingWireSource.value.id, target: node.id });
+    return;
+  }
   selectedElement.value = {
     type: 'device',
     title: node.label,
@@ -151,6 +182,52 @@ function onEdgeClick({ edge }) {
     title: edge.label,
     metadata: edge.data ?? { source: edge.source, target: edge.target }
   };
+}
+
+function openCli(nodeLike = selectedElement.value) {
+  if (!nodeLike || nodeLike.type !== 'device') return;
+  cliNode.value = nodeLike;
+  cliOutput.value = [
+    `Connecting to ${nodeLike.title}...`,
+    'Line protocol is up. Console ready.',
+    'Type help, show ip interface brief, show running-config, ping fabric, or clear.'
+  ];
+}
+
+function runCliCommand() {
+  const command = cliCommand.value.trim();
+  if (!command || !cliNode.value) return;
+  const lower = command.toLowerCase();
+  const metadata = cliNode.value.metadata ?? {};
+  let response = '';
+  if (lower === 'help') {
+    response = 'Supported commands: show ip interface brief, show running-config, show version, ping fabric, clear';
+  } else if (lower === 'clear') {
+    cliOutput.value = [];
+    cliCommand.value = '';
+    return;
+  } else if (lower.includes('interface')) {
+    response = [
+      'Interface              IP-Address      OK? Method Status Protocol',
+      `Mgmt0                  ${metadata.managementIp ?? '10.194.24.1'} YES manual up     up`,
+      'Eth0/0                 fabric-link     YES unset  up     up'
+    ].join('\n');
+  } else if (lower.includes('running-config')) {
+    response = [
+      `hostname ${cliNode.value.title}`,
+      `device-role ${metadata.role ?? metadata.deviceType ?? 'FABRIC_NODE'}`,
+      `packet-policy ${metadata.immutablePacketPolicy ?? 'metadata-only inspection'}`,
+      `fallback-tunnel ${metadata.fallbackTunnel ?? 'available'}`
+    ].join('\n');
+  } else if (lower.includes('version')) {
+    response = 'Reactor Packet OS 17.9 simulated CLI · Cisco-style lab mode · VueFlow fabric adapter';
+  } else if (lower.includes('ping')) {
+    response = '!!!!! Success rate is 100 percent, round-trip min/avg/max = 1/3/7 ms';
+  } else {
+    response = `% Unknown command: ${command}`;
+  }
+  cliOutput.value = [...cliOutput.value, `${cliNode.value.title}# ${command}`, response];
+  cliCommand.value = '';
 }
 </script>
 
@@ -177,6 +254,10 @@ function onEdgeClick({ edge }) {
         </section>
         <section>
           <h2>Wire Palette</h2>
+          <div class="tool-toggle">
+            <button :class="{ active: canvasTool === 'inspect' }" @click="canvasTool = 'inspect'; pendingWireSource = null">Inspect</button>
+            <button :class="{ active: canvasTool === 'wire' }" @click="canvasTool = 'wire'">Wire</button>
+          </div>
           <button
             v-for="wire in wirePalette"
             :key="wire.type"
@@ -186,6 +267,7 @@ function onEdgeClick({ edge }) {
             <strong>{{ wire.label }}</strong>
             <span>{{ wire.type }}</span>
           </button>
+          <p class="palette-hint">{{ pendingWireSource ? `Source selected: ${pendingWireSource.label}. Click destination.` : 'Wire mode: click source, then destination.' }}</p>
         </section>
         <button class="danger-button" @click="clearDesigner">Clear Canvas</button>
       </aside>
@@ -217,8 +299,17 @@ function onEdgeClick({ edge }) {
               <dd>{{ Array.isArray(value) ? value.join(', ') : value }}</dd>
             </template>
           </dl>
+          <button v-if="selectedElement.type === 'device'" class="secondary-button" @click="openCli()">Open CLI</button>
         </template>
         <p v-else>Select a device or wire to inspect metadata.</p>
+        <div v-if="cliNode" class="canvas-cli">
+          <strong>{{ cliNode.title }} CLI</strong>
+          <pre>{{ cliOutput.join('\n\n') }}</pre>
+          <label>
+            <span>{{ cliNode.title }}#</span>
+            <input v-model="cliCommand" @keydown.enter="runCliCommand" placeholder="show ip interface brief" />
+          </label>
+        </div>
       </aside>
     </div>
   </section>

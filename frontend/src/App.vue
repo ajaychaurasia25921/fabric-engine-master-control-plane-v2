@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import {
   askAiGuide,
   createFirewallRule,
@@ -55,6 +55,7 @@ const tabCopy = {
 };
 
 const activeTab = ref('dashboard');
+const themeMode = ref('system');
 const toast = ref('');
 const inventory = ref([
   { id: 'vm-1', name: 'edge-ingress-router-r1', role: 'CCNP_EDGE_CORE', platform: 'QEMU / KVM Host Bridge', ip: '10.194.24.102', uptime: '142h 11m', state: 'RUNNING' },
@@ -165,6 +166,11 @@ const transferSourceNode = computed(() => inventory.value.find((node) => node.id
 const transferDestinationNode = computed(() => inventory.value.find((node) => node.id === transferForm.destinationNodeId) ?? inventory.value[1] ?? inventory.value[0]);
 const selectedVdiNode = computed(() => inventory.value.find((node) => node.id === vdiForm.targetNodeId) ?? inventory.value[0]);
 const aiPersonaName = computed(() => (aiVoiceGender.value === 'male' ? 'Gabbar' : 'Aarohi'));
+const resolvedTheme = computed(() => {
+  if (themeMode.value !== 'system') return themeMode.value;
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+});
 const diagnosticCards = computed(() => {
   const overview = hardwareOverview.value ?? {};
   return [
@@ -208,6 +214,8 @@ const diagnosticCharts = computed(() => [
 ]);
 
 onMounted(async () => {
+  applyTheme();
+  window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change', applyTheme);
   loadBrowserVoices();
   if (typeof window !== 'undefined' && window.speechSynthesis) {
     window.speechSynthesis.onvoiceschanged = loadBrowserVoices;
@@ -235,13 +243,21 @@ onBeforeUnmount(() => {
     window.clearTimeout(speechRestartTimer);
   }
   speechRecognition?.stop();
+  window.matchMedia?.('(prefers-color-scheme: light)').removeEventListener?.('change', applyTheme);
 });
+
+watch(themeMode, applyTheme);
 
 function notify(message) {
   toast.value = message;
   window.setTimeout(() => {
     if (toast.value === message) toast.value = '';
   }, 3200);
+}
+
+function applyTheme() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.dataset.theme = resolvedTheme.value;
 }
 
 async function refreshHardwareOverview() {
@@ -818,7 +834,9 @@ function handleVdiCommand() {
     <aside class="nav-rail">
       <div>
         <div class="brand-block">
-          <div class="brand-mark">FE</div>
+          <div class="brand-mark">
+            <img src="https://imgs.search.brave.com/TYI2Iqlb7gAxB05WIYX8LvwJ7kKp_xER88boCAM-weo/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9jZG4u/aWNvbnNjb3V0LmNv/bS9pY29uL3ByZW1p/dW0vcG5nLTI1Ni10/aHVtYi9jb3Ntb3Mt/c3RpY2tlci1pY29u/LXN2Zy1kb3dubG9h/ZC1wbmctODEzMzU2/NS5wbmc_Zj13ZWJw/Jnc9MTI4" alt="Reactor logo" />
+          </div>
           <div>
             <h1>Reactor</h1>
             <p>v2.1.0 · MULTI-CLUSTER</p>
@@ -840,6 +858,14 @@ function handleVdiCommand() {
       <div class="nav-footer">
         <button class="utility-button" @click="packetCanvasOpen = true">Packet Canvas</button>
         <button class="utility-button amber" @click="vdiOpen = true">VDI Workspace</button>
+        <label>
+          Theme
+          <select v-model="themeMode">
+            <option value="system">System Sync</option>
+            <option value="dark">Dark</option>
+            <option value="light">Bright</option>
+          </select>
+        </label>
         <label>
           Gateway Sync Target
           <select>
@@ -904,6 +930,7 @@ function handleVdiCommand() {
             </div>
             <span class="status-chip" :class="hardwareOverview?.health?.status === 'UP' ? 'green' : 'amber'">{{ hardwareOverview?.health?.status || 'UP' }}</span>
           </div>
+          <p class="muted live-source">Live source: {{ hardwareOverview?.health?.metricsSource ?? 'PHYSICAL_HOST_PROCESS' }} · {{ hardwareOverview?.health?.physicalHostNote ?? 'Streaming live runtime metrics from Reactor backend.' }}</p>
           <div class="hardware-grid">
             <article v-for="card in diagnosticCards" :key="card.label">
               <span>{{ card.label }}</span>

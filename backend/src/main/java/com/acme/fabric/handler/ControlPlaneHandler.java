@@ -137,6 +137,7 @@ public class ControlPlaneHandler {
         long diskUsedBytes = Math.max(0, diskTotalBytes - root.getUsableSpace());
         int availableProcessors = runtime.availableProcessors();
         long uptimeSeconds = runtimeMxBean.getUptime() / 1_000;
+        boolean containerized = new File("/.dockerenv").exists() || System.getenv("KUBERNETES_SERVICE_HOST") != null;
         double heapUsedPercent = percent(heap.getUsed(), heap.getMax() > 0 ? heap.getMax() : heap.getCommitted());
         double memoryUsedPercent = percent(usedMemoryBytes, totalMemoryBytes);
         double diskUsedPercent = percent(diskUsedBytes, diskTotalBytes);
@@ -172,6 +173,10 @@ public class ControlPlaneHandler {
                         "r2dbc", "UP",
                         "ollama", "LOCAL_OR_FALLBACK_READY",
                         "sse", "UP",
+                        "metricsSource", containerized ? "CONTAINER_RUNTIME" : "PHYSICAL_HOST_PROCESS",
+                        "physicalHostNote", containerized
+                                ? "Docker Desktop exposes container runtime metrics. Run backend on the host or attach a host metrics agent for full physical macOS telemetry."
+                                : "Backend process is reading live operating-system and JVM metrics from the physical host.",
                         "checkedAt", Instant.now().toString()
                 ),
                 Map.of(
