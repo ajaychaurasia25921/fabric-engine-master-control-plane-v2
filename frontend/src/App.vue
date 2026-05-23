@@ -82,8 +82,11 @@ const tabCopy = {
 };
 
 const activeTab = ref('dashboard');
-const themeMode = ref('system');
-const openNavGroups = reactive(Object.fromEntries(navGroups.map((group) => [group.label, true])));
+const themeMode = ref('dark');
+const openNavGroups = reactive(Object.fromEntries(navGroups.map((group) => [
+  group.label,
+  group.tabs.some(([id]) => id === activeTab.value)
+])));
 const toast = ref('');
 const inventory = ref([
   { id: 'vm-1', name: 'edge-ingress-router-r1', role: 'CCNP_EDGE_CORE', platform: 'QEMU / KVM Host Bridge', ip: '10.194.24.102', uptime: '142h 11m', state: 'RUNNING' },
@@ -441,6 +444,7 @@ async function submitServer() {
   }, ...inventory.value];
   notify(`Node allocation loop '${payload.serverName}' triggered successfully.`);
   activeTab.value = 'dashboard';
+  openActiveNavGroup();
 }
 
 async function sendGuideMessage() {
@@ -625,9 +629,11 @@ function approveAgentAction(action) {
   }, ...approvalHistory.value].slice(0, 20);
   if (action.commandType === 'OPEN_TAB') {
     activeTab.value = action.payload.target;
+    openActiveNavGroup();
   }
   if (action.commandType === 'SET_PROVISIONING_ROLE') {
     activeTab.value = 'servers';
+    openActiveNavGroup();
     serverForm.targetRoleClass = action.payload.targetRoleClass;
     serverForm.placementMode = action.payload.placementMode;
     serverForm.deploymentFramework = 'VIRTUAL_MACHINE';
@@ -645,6 +651,14 @@ function rejectAgentAction(action) {
   }, ...approvalHistory.value].slice(0, 20);
   aiPendingActions.value = aiPendingActions.value.filter((item) => item.actionId !== action.actionId);
   aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: founder decision noted. I will not perform: ${action.label}` }];
+}
+
+function openActiveNavGroup() {
+  navGroups.forEach((group) => {
+    if (group.tabs.some(([id]) => id === activeTab.value)) {
+      openNavGroups[group.label] = true;
+    }
+  });
 }
 
 function terminateInstance(id) {
