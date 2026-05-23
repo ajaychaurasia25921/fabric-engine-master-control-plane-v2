@@ -173,6 +173,12 @@ public final class FabricModels {
             Map<String, Object> memory,
             Map<String, Object> storage,
             Map<String, Object> network,
+            Map<String, Object> health,
+            Map<String, Object> process,
+            Map<String, Object> threads,
+            Map<String, Object> jvm,
+            Map<String, Object> vmPool,
+            Map<String, Object> graphs,
             List<String> aiSuggestions,
             List<String> alerts
     ) {
