@@ -36,6 +36,9 @@ import com.acme.fabric.domain.FabricModels.HardwareOverview;
 import com.acme.fabric.domain.FabricModels.HoneypotIncidentRecord;
 import com.acme.fabric.domain.FabricModels.IdentityScrambleIntent;
 import com.acme.fabric.domain.FabricModels.LocalVmCreateRequest;
+import com.acme.fabric.domain.FabricModels.NlpCommandRequest;
+import com.acme.fabric.domain.FabricModels.NlpCommandResponse;
+import com.acme.fabric.domain.FabricModels.NlpEntity;
 import com.acme.fabric.domain.FabricModels.PacketTraceRequest;
 import com.acme.fabric.domain.FabricModels.PacketTraceResult;
 import com.acme.fabric.domain.FabricModels.PipelineRequest;
@@ -340,6 +343,12 @@ public class ControlPlaneHandler {
                 .flatMap(response -> ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(response));
     }
 
+    public Mono<ServerResponse> interpretNaturalLanguage(ServerRequest request) {
+        return request.bodyToMono(NlpCommandRequest.class)
+                .map(this::interpret)
+                .flatMap(response -> ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(response));
+    }
+
     public Mono<ServerResponse> firewallRules(ServerRequest request) {
         return ServerResponse.ok().contentType(APPLICATION_JSON).body(Flux.fromIterable(firewallRules), FirewallRuleEntity.class);
     }
@@ -473,6 +482,118 @@ public class ControlPlaneHandler {
                 "Attach internet uplink and fabric bridge for dual-IP control.",
                 "Register MAC identity and expose hardware telemetry in 360 view."
         );
+    }
+
+    private NlpCommandResponse interpret(NlpCommandRequest request) {
+        String raw = request.utterance() == null ? "" : request.utterance().trim();
+        String normalized = raw.toLowerCase();
+        String language = detectLanguage(raw, request.language());
+        String persona = request.persona() == null || request.persona().isBlank() ? "Aarohi" : request.persona();
+        String intent = classifyIntent(normalized);
+        String risk = riskLevel(intent, normalized);
+        List<NlpEntity> entities = extractEntities(raw, normalized);
+        List<AgentActionProposal> proposals = proposalsForIntent(intent, entities);
+        boolean approvalRequired = !"OBSERVE_360".equals(intent) && !"ASK_HELP".equals(intent);
+
+        String response = naturalNlpResponse(persona, language, intent, risk, approvalRequired);
+        return new NlpCommandResponse(
+                "nlp-" + UUID.randomUUID().toString().substring(0, 8),
+                normalized,
+                language,
+                intent,
+                confidenceFor(intent, entities),
+                risk,
+                approvalRequired,
+                entities,
+                response,
+                proposals
+        );
+    }
+
+    private String detectLanguage(String raw, String requestedLanguage) {
+        if (requestedLanguage != null && !requestedLanguage.isBlank() && !"auto".equals(requestedLanguage)) {
+            return requestedLanguage;
+        }
+        if (raw.matches(".*[\\u0900-\\u097F].*")) {
+            return "hi-IN";
+        }
+        if (raw.toLowerCase().matches(".*\\b(karo|banao|dikhao|chalao|server|machine|node)\\b.*")) {
+            return "hi-IN";
+        }
+        return "en-IN";
+    }
+
+    private String classifyIntent(String text) {
+        if (text.matches(".*\\b(ai vm|llm|ollama|gpu|model server)\\b.*")) return "CREATE_AI_VM";
+        if (text.matches(".*\\b(vm|virtual machine|server|provision|create machine|banao)\\b.*")) return "PROVISION_SERVER";
+        if (text.matches(".*\\b(packet|trace|encrypted|encoded|metadata|tunnel|fallback)\\b.*")) return "TRACE_PACKET";
+        if (text.matches(".*\\b(file|folder|transfer|upload|share|copy)\\b.*")) return "TRANSFER_FILE";
+        if (text.matches(".*\\b(memory|cpu|thread|jvm|health|360|diagnostic|monitor)\\b.*")) return "OBSERVE_360";
+        if (text.matches(".*\\b(firewall|block|honeypot|security|alert|attack)\\b.*")) return "SECURITY_POLICY";
+        if (text.matches(".*\\b(quantum|qpu|qubit|circuit)\\b.*")) return "CREATE_QUANTUM_VM";
+        return "ASK_HELP";
+    }
+
+    private String riskLevel(String intent, String text) {
+        if (text.matches(".*\\b(delete|destroy|shutdown|block|quarantine|firewall)\\b.*")) return "HIGH";
+        return switch (intent) {
+            case "PROVISION_SERVER", "CREATE_AI_VM", "CREATE_QUANTUM_VM", "SECURITY_POLICY" -> "MEDIUM";
+            case "TRACE_PACKET", "TRANSFER_FILE" -> "LOW";
+            default -> "INFO";
+        };
+    }
+
+    private List<NlpEntity> extractEntities(String raw, String normalized) {
+        List<NlpEntity> entities = new java.util.ArrayList<>();
+        java.util.regex.Matcher ipMatcher = java.util.regex.Pattern.compile("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b").matcher(raw);
+        while (ipMatcher.find()) {
+            entities.add(new NlpEntity("ipAddress", ipMatcher.group(), 0.96));
+        }
+        java.util.regex.Matcher macMatcher = java.util.regex.Pattern.compile("\\b[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}\\b").matcher(raw);
+        while (macMatcher.find()) {
+            entities.add(new NlpEntity("macAddress", macMatcher.group(), 0.98));
+        }
+        java.util.regex.Matcher nodeMatcher = java.util.regex.Pattern.compile("\\b(?:node|vm|server|router|switch)[-_\\s]?[a-zA-Z0-9._-]+\\b").matcher(raw);
+        while (nodeMatcher.find()) {
+            entities.add(new NlpEntity("node", nodeMatcher.group(), 0.82));
+        }
+        if (normalized.contains("female") || normalized.contains("aarohi")) entities.add(new NlpEntity("persona", "Aarohi", 0.9));
+        if (normalized.contains("male") || normalized.contains("gabbar")) entities.add(new NlpEntity("persona", "Gabbar", 0.9));
+        return entities;
+    }
+
+    private double confidenceFor(String intent, List<NlpEntity> entities) {
+        if ("ASK_HELP".equals(intent)) return 0.62;
+        return Math.min(0.97, 0.78 + entities.size() * 0.04);
+    }
+
+    private List<AgentActionProposal> proposalsForIntent(String intent, List<NlpEntity> entities) {
+        return switch (intent) {
+            case "CREATE_AI_VM" -> List.of(
+                    new AgentActionProposal("nlp-open-ai-vm", "Prepare AI VM", "Open provisioning with AI VM defaults.", "SET_PROVISIONING_ROLE", Map.of("targetRoleClass", "AI_VM", "placementMode", "PHYSICAL_HOST_VM")),
+                    new AgentActionProposal("nlp-review-360", "Review 360 health", "Check CPU, memory, JVM and VM pool before creating the VM.", "OPEN_TAB", Map.of("target", "360-view"))
+            );
+            case "PROVISION_SERVER", "CREATE_QUANTUM_VM" -> List.of(
+                    new AgentActionProposal("nlp-open-provisioning", "Open provisioning", "Prepare guarded server provisioning form.", "OPEN_TAB", Map.of("target", "servers")),
+                    new AgentActionProposal("nlp-open-approvals", "Founder approval", "Send this infrastructure action to approval dashboard.", "OPEN_TAB", Map.of("target", "approvals"))
+            );
+            case "TRACE_PACKET" -> List.of(new AgentActionProposal("nlp-trace-packet", "Open packet tracing", "Inspect metadata and fallback tunnel decisions.", "OPEN_TAB", Map.of("target", "packet-tracing")));
+            case "TRANSFER_FILE" -> List.of(new AgentActionProposal("nlp-file-transfer", "Open file transport", "Prepare source, destination, and compression-aware transfer.", "OPEN_TAB", Map.of("target", "file-transport")));
+            case "SECURITY_POLICY" -> List.of(new AgentActionProposal("nlp-security", "Open security plane", "Review firewall or honeypot action before commit.", "OPEN_TAB", Map.of("target", "security-plane")));
+            case "OBSERVE_360" -> List.of(new AgentActionProposal("nlp-360", "Open 360 View", "Show live CPU, memory, JVM, process and VM metrics.", "OPEN_TAB", Map.of("target", "360-view")));
+            default -> List.of(new AgentActionProposal("nlp-help", "Open dashboard", "Start from the main control room.", "OPEN_TAB", Map.of("target", "dashboard")));
+        };
+    }
+
+    private String naturalNlpResponse(String persona, String language, String intent, String risk, boolean approvalRequired) {
+        if ("hi-IN".equals(language)) {
+            return persona + " samajh gaya. Intent " + intent + " hai, risk " + risk + " hai. "
+                    + (approvalRequired ? "Main ise founder approval ke bina execute nahi karunga." : "Yeh observation action hai, isko safe maana ja sakta hai.")
+                    + " Maine next action proposal taiyaar kar diya hai.";
+        }
+        return persona + " understood you. I mapped the request to " + intent + " with " + risk + " risk. "
+                + (approvalRequired ? "I will route execution through founder approval before changing Reactor state." : "This is observation-only, so it can open safely.")
+                + " I prepared the next action proposal for the dashboard.";
     }
 
     private String aiGuideText(AiGuidePrompt prompt) {

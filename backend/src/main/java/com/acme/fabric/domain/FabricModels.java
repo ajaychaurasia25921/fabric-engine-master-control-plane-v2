@@ -193,6 +193,26 @@ public final class FabricModels {
     public record AgentActionProposal(String actionId, String label, String description, String commandType, Map<String, Object> payload) {
     }
 
+    public record NlpCommandRequest(@NotBlank String utterance, String language, String persona, Map<String, Object> context) {
+    }
+
+    public record NlpEntity(String name, String value, double confidence) {
+    }
+
+    public record NlpCommandResponse(
+            String requestId,
+            String normalizedText,
+            String detectedLanguage,
+            String intent,
+            double confidence,
+            String riskLevel,
+            boolean founderApprovalRequired,
+            List<NlpEntity> entities,
+            String spokenResponse,
+            List<AgentActionProposal> actionProposals
+    ) {
+    }
+
     public record LocalVmCreateRequest(
             @NotBlank String vmName,
             @NotBlank String provider,

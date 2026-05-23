@@ -10,6 +10,7 @@ import {
   fetchFirewallRules,
   fetchHoneypotIncidents,
   fetchLocalVmProviders,
+  interpretNaturalLanguage,
   provisionServer,
   registerDevice,
   runTerminalCommand,
@@ -118,6 +119,7 @@ const aiVoiceEnabled = ref(true);
 const aiVoiceGender = ref('female');
 const aiLanguage = ref('auto');
 const aiPendingActions = ref([]);
+const aiNlpInsight = ref(null);
 const approvalHistory = ref([]);
 const aiListening = ref(false);
 const aiVoiceMode = ref('natural');
@@ -452,15 +454,24 @@ async function sendGuideMessage() {
   if (!message) return;
   aiGuideMessages.value = [...aiGuideMessages.value, { role: 'user', text: message }];
   aiGuideInput.value = '';
-  const response = await askAiGuide({
-    message,
+  const nlp = await interpretNaturalLanguage({
+    utterance: message,
     persona: aiPersonaName.value,
     language: aiLanguage.value,
     context: { activeTab: activeTab.value, inventory: inventory.value }
   });
-  aiPendingActions.value = response.actionProposals ?? [];
-  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: response.response, actions: aiPendingActions.value.map((action) => action.label) }];
-  speakGuideResponse(response.response);
+  aiNlpInsight.value = nlp;
+  const response = await askAiGuide({
+    message,
+    persona: aiPersonaName.value,
+    language: aiLanguage.value,
+    context: { activeTab: activeTab.value, inventory: inventory.value, nlp }
+  });
+  aiPendingActions.value = [...(nlp.actionProposals ?? []), ...(response.actionProposals ?? [])]
+    .filter((action, index, list) => list.findIndex((item) => item.actionId === action.actionId) === index);
+  const guideText = `${nlp.spokenResponse} ${response.response}`;
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: guideText, actions: aiPendingActions.value.map((action) => action.label) }];
+  speakGuideResponse(guideText);
 }
 
 function loadBrowserVoices() {
@@ -1569,6 +1580,12 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
         <div class="voice-status">
           <span>{{ aiGuideStatus }}</span>
           <small v-if="aiInterimTranscript">{{ aiInterimTranscript }}</small>
+        </div>
+        <div v-if="aiNlpInsight" class="nlp-insight">
+          <span>NLP intent</span>
+          <strong>{{ aiNlpInsight.intent }}</strong>
+          <small>{{ aiNlpInsight.detectedLanguage }} · confidence {{ Math.round(aiNlpInsight.confidence * 100) }}% · {{ aiNlpInsight.riskLevel }} risk</small>
+          <em v-if="aiNlpInsight.founderApprovalRequired">Founder approval required before execution</em>
         </div>
         <div class="guide-messages">
           <article v-for="(message, index) in aiGuideMessages" :key="index" :class="message.role">

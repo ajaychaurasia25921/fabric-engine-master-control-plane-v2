@@ -73,6 +73,15 @@ export async function askAiGuide(payload) {
   return parseJson(response, 'AI guide unavailable');
 }
 
+export async function interpretNaturalLanguage(payload) {
+  const response = await fetch(`${API_BASE}/api/v1/ai-guide/nlp/interpret`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'NLP interpreter unavailable');
+}
+
 export async function scrambleIdentity() {
   const response = await fetch(`${API_BASE}/api/v1/network/identity/scramble`, {
     method: 'POST',

@@ -32,6 +32,7 @@ public class FabricRouter {
                 .andRoute(GET("/api/v1/local-vms/providers"), controlPlaneHandler::localVmProviders)
                 .andRoute(POST("/api/v1/local-vms"), controlPlaneHandler::createLocalVm)
                 .andRoute(POST("/api/v1/ai-guide/chat"), controlPlaneHandler::aiGuide)
+                .andRoute(POST("/api/v1/ai-guide/nlp/interpret"), controlPlaneHandler::interpretNaturalLanguage)
                 .andRoute(GET("/api/v1/security/firewall/rules"), controlPlaneHandler::firewallRules)
                 .andRoute(POST("/api/v1/security/firewall/rules"), controlPlaneHandler::createFirewallRule)
                 .andRoute(GET("/api/v1/security/honeypots/incidents"), controlPlaneHandler::honeypotIncidents)
