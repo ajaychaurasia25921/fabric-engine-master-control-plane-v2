@@ -21,6 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import com.acme.fabric.domain.FabricModels.AllocationMetadata;
 import com.acme.fabric.domain.FabricModels.AiGuidePrompt;
 import com.acme.fabric.domain.FabricModels.AiGuideResponse;
+import com.acme.fabric.domain.FabricModels.AgentActionProposal;
 import com.acme.fabric.domain.FabricModels.ComputeJobStatus;
 import com.acme.fabric.domain.FabricModels.DeviceRegistrationRequest;
 import com.acme.fabric.domain.FabricModels.DeviceRegistrationResponse;
@@ -132,10 +133,32 @@ public class ControlPlaneHandler {
         return request.bodyToMono(AiGuidePrompt.class)
                 .map(prompt -> new AiGuideResponse(
                         "guide-" + UUID.randomUUID().toString().substring(0, 8),
-                        "Fabric Companion",
-                        "I can help wire devices, register MAC identities, decide whether to provision on the physical host or a remote node, and explain alerts. For this request: "
-                                + prompt.message(),
-                        List.of("Open Packet Canvas", "Review Hardware 360", "Run Node Eligibility Check")
+                        prompt.persona() == null ? "Aarohi" : prompt.persona(),
+                        prompt.language() == null ? "auto" : prompt.language(),
+                        aiGuideText(prompt),
+                        List.of(
+                                new AgentActionProposal(
+                                        "open-packet-canvas",
+                                        "Open Packet Canvas",
+                                        "Open the VueFlow designer so I can help you wire devices.",
+                                        "OPEN_TAB",
+                                        Map.of("target", "packet-tracing")
+                                ),
+                                new AgentActionProposal(
+                                        "review-360",
+                                        "Review 360 View",
+                                        "Open diagnostics before changing infrastructure state.",
+                                        "OPEN_TAB",
+                                        Map.of("target", "360-view")
+                                ),
+                                new AgentActionProposal(
+                                        "prepare-ai-vm",
+                                        "Prepare AI VM Form",
+                                        "Switch provisioning to AI VM on the local physical host pool.",
+                                        "SET_PROVISIONING_ROLE",
+                                        Map.of("targetRoleClass", "AI_VM", "placementMode", "PHYSICAL_HOST_VM")
+                                )
+                        )
                 ))
                 .flatMap(response -> ServerResponse.ok().contentType(APPLICATION_JSON).bodyValue(response));
     }
@@ -273,5 +296,13 @@ public class ControlPlaneHandler {
                 "Attach internet uplink and fabric bridge for dual-IP control.",
                 "Register MAC identity and expose hardware telemetry in 360 view."
         );
+    }
+
+    private String aiGuideText(AiGuidePrompt prompt) {
+        String persona = prompt.persona() == null ? "Aarohi" : prompt.persona();
+        String language = prompt.language() == null ? "auto" : prompt.language();
+        return persona + " online. I can understand multilingual operator intent, explain the plan in " + language
+                + ", and prepare actions only after your approval. I will never change Reactor state without asking you first. Your request was: "
+                + prompt.message();
     }
 }

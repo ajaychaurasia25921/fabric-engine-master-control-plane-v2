@@ -178,10 +178,13 @@ public final class FabricModels {
     ) {
     }
 
-    public record AiGuidePrompt(@NotBlank String message, Map<String, Object> context) {
+    public record AiGuidePrompt(@NotBlank String message, String persona, String language, Map<String, Object> context) {
     }
 
-    public record AiGuideResponse(String guideId, String persona, String response, List<String> suggestedActions) {
+    public record AiGuideResponse(String guideId, String persona, String language, String response, List<AgentActionProposal> actionProposals) {
+    }
+
+    public record AgentActionProposal(String actionId, String label, String description, String commandType, Map<String, Object> payload) {
     }
 
     public record PolyglotFunctionBlueprintRequest(

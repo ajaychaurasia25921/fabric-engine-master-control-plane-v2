@@ -726,6 +726,12 @@ textarea {
   min-height: 170px;
 }
 
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .endpoint-line {
   display: flex;
   align-items: center;
@@ -1201,6 +1207,39 @@ textarea {
   font-size: 11px;
 }
 
+.guide-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr 88px auto;
+  gap: 8px;
+  align-items: end;
+  border-bottom: 1px solid #1f2937;
+  padding: 10px;
+  background: #020617;
+}
+
+.guide-settings label {
+  display: grid;
+  gap: 5px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.guide-settings select {
+  padding: 8px;
+}
+
+.guide-settings button {
+  border: 1px solid rgba(20, 184, 166, 0.45);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #99f6e4;
+  background: rgba(15, 118, 110, 0.28);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .guide-messages {
   display: grid;
   gap: 8px;
@@ -1231,6 +1270,60 @@ textarea {
   display: block;
   margin-top: 5px;
   color: #94a3b8;
+}
+
+.agent-actions {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #1f2937;
+  padding: 10px;
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.agent-actions > strong {
+  color: #fbbf24;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.agent-actions article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.agent-actions b,
+.agent-actions span {
+  display: block;
+}
+
+.agent-actions b {
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.agent-actions span {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.agent-actions button {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 9px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.agent-actions button.danger {
+  background: #991b1b;
 }
 
 .guide-panel form {

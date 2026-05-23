@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import {
   askAiGuide,
   createFirewallRule,
@@ -22,6 +22,7 @@ import SmsDispatchPanel from './components/SmsDispatchPanel.vue';
 
 const tabs = [
   ['dashboard', 'Main Dashboard'],
+  ['360-view', '360 View'],
   ['servers', 'Enterprise Provisioning'],
   ['sms-gateway', 'SMS Gateway Hub'],
   ['terminal-access', 'SSH / Telnet Terminals'],
@@ -36,6 +37,7 @@ const tabs = [
 
 const tabCopy = {
   dashboard: ['System Infrastructure Control Room', 'Unified master plane lifecycle validation interface.'],
+  '360-view': ['360 View', 'Physical host diagnostics, actuator-style runtime panels, and AI operations guidance.'],
   servers: ['Enterprise Cluster Provisioning Bay', 'Inject dynamic microcode metadata parameters across server resource blueprints.'],
   'sms-gateway': ['SMS Telecom Gateway Aggregator Hub', 'Realtime critical SMS alerting dispatcher framework and transaction monitor.'],
   'terminal-access': ['Secure Remote VTY Terminals Console', 'Direct cryptographic console loop pipelines into cluster edge endpoints.'],
@@ -69,8 +71,15 @@ const deviceRegistration = ref(null);
 const aiGuideOpen = ref(true);
 const aiGuideInput = ref('How do I provision an AI VM and register it on the fabric?');
 const aiGuideMessages = ref([
-  { role: 'guide', text: 'Hi, I am your Reactor Companion. Ask me about provisioning, wiring, alerts, or node eligibility.' }
+  { role: 'guide', text: 'Aarohi online. I can speak, listen, understand multilingual instructions, and propose Reactor actions for your approval.' }
 ]);
+const aiVoiceEnabled = ref(true);
+const aiVoiceGender = ref('female');
+const aiLanguage = ref('auto');
+const aiPendingActions = ref([]);
+const aiListening = ref(false);
+const browserVoices = ref([]);
+let speechRecognition;
 const packetCanvasOpen = ref(false);
 const vdiOpen = ref(false);
 const vdiConnected = ref(false);
@@ -131,8 +140,13 @@ const honeypotCount = computed(() => Math.max(3, incidents.value.length || 0));
 const transferSourceNode = computed(() => inventory.value.find((node) => node.id === transferForm.sourceNodeId) ?? inventory.value[0]);
 const transferDestinationNode = computed(() => inventory.value.find((node) => node.id === transferForm.destinationNodeId) ?? inventory.value[1] ?? inventory.value[0]);
 const selectedVdiNode = computed(() => inventory.value.find((node) => node.id === vdiForm.targetNodeId) ?? inventory.value[0]);
+const aiPersonaName = computed(() => (aiVoiceGender.value === 'male' ? 'Gabbar' : 'Aarohi'));
 
 onMounted(async () => {
+  loadBrowserVoices();
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = loadBrowserVoices;
+  }
   try {
     firewallRules.value = await fetchFirewallRules();
     incidents.value = await fetchHoneypotIncidents();
@@ -140,6 +154,13 @@ onMounted(async () => {
   } catch {
     notify('Backend control-plane APIs are still warming up.');
   }
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+  speechRecognition?.stop();
 });
 
 function notify(message) {
@@ -225,8 +246,86 @@ async function sendGuideMessage() {
   if (!message) return;
   aiGuideMessages.value = [...aiGuideMessages.value, { role: 'user', text: message }];
   aiGuideInput.value = '';
-  const response = await askAiGuide({ message, context: { activeTab: activeTab.value, inventory: inventory.value } });
-  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: response.response, actions: response.suggestedActions }];
+  const response = await askAiGuide({
+    message,
+    persona: aiPersonaName.value,
+    language: aiLanguage.value,
+    context: { activeTab: activeTab.value, inventory: inventory.value }
+  });
+  aiPendingActions.value = response.actionProposals ?? [];
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: response.response, actions: aiPendingActions.value.map((action) => action.label) }];
+  speakGuideResponse(response.response);
+}
+
+function loadBrowserVoices() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  browserVoices.value = window.speechSynthesis.getVoices();
+}
+
+function preferredVoice() {
+  const voices = browserVoices.value.filter((voice) => voice.lang?.toLowerCase().startsWith('en'));
+  const maleHints = ['male', 'ravi', 'daniel', 'alex', 'fred', 'david', 'mark', 'george', 'arthur'];
+  const femaleHints = ['female', 'veena', 'samantha', 'victoria', 'karen', 'susan', 'zira', 'sara', 'ava'];
+  const hints = aiVoiceGender.value === 'male' ? maleHints : femaleHints;
+  return voices.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint)))
+    ?? voices[0]
+    ?? browserVoices.value[0];
+}
+
+function speakGuideResponse(text) {
+  if (!aiVoiceEnabled.value || typeof window === 'undefined' || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = preferredVoice();
+  utterance.rate = 0.95;
+  utterance.pitch = aiVoiceGender.value === 'male' ? 0.86 : 1.08;
+  window.speechSynthesis.speak(utterance);
+}
+
+function startVoiceInput() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    notify('Speech input is not supported in this browser.');
+    return;
+  }
+  speechRecognition?.stop();
+  speechRecognition = new Recognition();
+  speechRecognition.lang = aiLanguage.value === 'hi-IN' ? 'hi-IN' : aiLanguage.value === 'en-IN' || aiLanguage.value === 'auto' ? 'en-IN' : aiLanguage.value;
+  speechRecognition.interimResults = false;
+  speechRecognition.continuous = false;
+  speechRecognition.onstart = () => {
+    aiListening.value = true;
+  };
+  speechRecognition.onend = () => {
+    aiListening.value = false;
+  };
+  speechRecognition.onerror = () => {
+    aiListening.value = false;
+    notify('Voice capture stopped. Check microphone permission.');
+  };
+  speechRecognition.onresult = (event) => {
+    aiGuideInput.value = event.results?.[0]?.[0]?.transcript ?? aiGuideInput.value;
+  };
+  speechRecognition.start();
+}
+
+function approveAgentAction(action) {
+  if (action.commandType === 'OPEN_TAB') {
+    activeTab.value = action.payload.target;
+  }
+  if (action.commandType === 'SET_PROVISIONING_ROLE') {
+    activeTab.value = 'servers';
+    serverForm.targetRoleClass = action.payload.targetRoleClass;
+    serverForm.placementMode = action.payload.placementMode;
+    serverForm.deploymentFramework = 'VIRTUAL_MACHINE';
+  }
+  aiPendingActions.value = aiPendingActions.value.filter((item) => item.actionId !== action.actionId);
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: action approved and applied: ${action.label}` }];
+}
+
+function rejectAgentAction(action) {
+  aiPendingActions.value = aiPendingActions.value.filter((item) => item.actionId !== action.actionId);
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: understood, I will not perform: ${action.label}` }];
 }
 
 function terminateInstance(id) {
@@ -552,11 +651,14 @@ function handleVdiCommand() {
 
         <FabricCanvas mode="static" />
 
+      </section>
+
+      <section v-if="activeTab === '360-view'" class="tab-page">
         <section class="panel">
           <div class="panel-title-row">
             <div>
-              <h3>360 Physical Host Hardware Monitor</h3>
-              <p class="muted">All VMs are allocated from the local physical system pool unless a remote node passes eligibility.</p>
+              <h3>360 Physical System Diagnostics</h3>
+              <p class="muted">Spring Boot Admin-style operating view for host health, actuator-like telemetry, JVM/runtime state, and AI suggestions.</p>
             </div>
             <span class="status-chip green">{{ hardwareOverview?.physicalHost || 'local-physical-host' }}</span>
           </div>
@@ -566,10 +668,23 @@ function handleVdiCommand() {
             <article><span>VM Pool</span><strong>{{ hardwareOverview?.storage?.usedGb ?? 226 }} / {{ hardwareOverview?.storage?.vmPoolGb ?? 512 }} GB</strong><small>{{ hardwareOverview?.storage?.iopsState ?? 'HEALTHY' }}</small></article>
             <article><span>Network</span><strong>{{ hardwareOverview?.network?.fabricInterfaces ?? 2 }} NICs</strong><small>Internet + Fabric bridge</small></article>
           </div>
-          <div class="suggestion-list">
-            <strong>AI Suggestions & Alerts</strong>
-            <p v-for="item in [...(hardwareOverview?.aiSuggestions ?? []), ...(hardwareOverview?.alerts ?? [])]" :key="item">{{ item }}</p>
-          </div>
+        </section>
+        <section class="admin-grid">
+          <article class="panel"><h3>Health</h3><pre class="console-frame compact">UP
+db: UP
+r2dbc: UP
+ollama: DEGRADED fallback-ready
+sse: UP</pre></article>
+          <article class="panel"><h3>Actuator</h3><pre class="console-frame compact">/actuator/health
+/actuator/metrics
+/actuator/env
+/actuator/loggers
+/api/v1/hardware/overview</pre></article>
+          <article class="panel"><h3>Runtime</h3><pre class="console-frame compact">Spring WebFlux Netty: RUNNING
+Flyway schema: v1
+R2DBC event-loop: non-blocking
+AI mode: local Ollama + rule fallback</pre></article>
+          <article class="panel"><h3>AI Suggestions & Alerts</h3><div class="suggestion-list"><p v-for="item in [...(hardwareOverview?.aiSuggestions ?? []), ...(hardwareOverview?.alerts ?? [])]" :key="item">{{ item }}</p></div></article>
         </section>
       </section>
 
@@ -893,13 +1008,47 @@ function handleVdiCommand() {
       <button class="guide-avatar" @click="aiGuideOpen = !aiGuideOpen">AI</button>
       <div v-if="aiGuideOpen" class="guide-panel">
         <header>
-          <strong>Reactor Companion</strong>
-          <span>talking NLP guide</span>
+          <strong>{{ aiPersonaName }}</strong>
+          <span>agentic NLP guide</span>
         </header>
+        <div class="guide-settings">
+          <label>Agent
+            <select v-model="aiVoiceGender">
+              <option value="female">Aarohi · Female</option>
+              <option value="male">Gabbar · Male</option>
+            </select>
+          </label>
+          <label>Language
+            <select v-model="aiLanguage">
+              <option value="auto">Auto / Any</option>
+              <option value="en-IN">English India</option>
+              <option value="hi-IN">Hindi India</option>
+              <option value="en-US">English US</option>
+            </select>
+          </label>
+          <label>Talk
+            <select v-model="aiVoiceEnabled">
+              <option :value="true">On</option>
+              <option :value="false">Off</option>
+            </select>
+          </label>
+          <button type="button" @click="startVoiceInput">{{ aiListening ? 'Listening...' : 'Speak' }}</button>
+        </div>
         <div class="guide-messages">
           <article v-for="(message, index) in aiGuideMessages" :key="index" :class="message.role">
             <p>{{ message.text }}</p>
             <small v-if="message.actions">{{ message.actions.join(' · ') }}</small>
+          </article>
+        </div>
+        <div v-if="aiPendingActions.length" class="agent-actions">
+          <strong>Needs your approval</strong>
+          <article v-for="action in aiPendingActions" :key="action.actionId">
+            <div>
+              <b>{{ action.label }}</b>
+              <span>{{ action.description }}</span>
+            </div>
+            <button @click="approveAgentAction(action)">Approve</button>
+            <button class="danger" @click="rejectAgentAction(action)">Reject</button>
           </article>
         </div>
         <form @submit.prevent="sendGuideMessage">
