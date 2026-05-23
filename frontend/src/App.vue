@@ -73,6 +73,8 @@ const quantumStatus = ref('STANDBY');
 const socketOutput = ref('');
 const hardwareOverview = ref(null);
 const hardwareHistory = ref([]);
+const hardwareLastRefresh = ref('');
+const hardwareRefreshState = ref('starting');
 const localVmProviders = ref([]);
 const localVmResult = ref(null);
 const deviceRegistration = ref(null);
@@ -225,10 +227,10 @@ onMounted(async () => {
     incidents.value = await fetchHoneypotIncidents();
     await refreshHardwareOverview();
     localVmProviders.value = await fetchLocalVmProviders();
-    diagnosticsTimer = window.setInterval(refreshHardwareOverview, 5000);
   } catch {
     notify('Backend control-plane APIs are still warming up.');
   }
+  diagnosticsTimer = window.setInterval(refreshHardwareOverview, 5000);
 });
 
 onBeforeUnmount(() => {
@@ -261,9 +263,16 @@ function applyTheme() {
 }
 
 async function refreshHardwareOverview() {
-  const overview = await fetchHardwareOverview();
-  hardwareOverview.value = overview;
-  recordHardwareSample(overview);
+  try {
+    hardwareRefreshState.value = 'refreshing';
+    const overview = await fetchHardwareOverview();
+    hardwareOverview.value = overview;
+    hardwareLastRefresh.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    hardwareRefreshState.value = 'live';
+    recordHardwareSample(overview);
+  } catch {
+    hardwareRefreshState.value = 'retrying';
+  }
 }
 
 function recordHardwareSample(overview) {
@@ -930,7 +939,11 @@ function handleVdiCommand() {
             </div>
             <span class="status-chip" :class="hardwareOverview?.health?.status === 'UP' ? 'green' : 'amber'">{{ hardwareOverview?.health?.status || 'UP' }}</span>
           </div>
-          <p class="muted live-source">Live source: {{ hardwareOverview?.health?.metricsSource ?? 'PHYSICAL_HOST_PROCESS' }} · {{ hardwareOverview?.health?.physicalHostNote ?? 'Streaming live runtime metrics from Reactor backend.' }}</p>
+          <p class="muted live-source">
+            Live source: {{ hardwareOverview?.health?.metricsSource ?? 'PHYSICAL_HOST_PROCESS' }} · Refresh: every 5 seconds · Last sample: {{ hardwareLastRefresh || 'waiting' }} · {{ hardwareRefreshState }}
+            <br />
+            {{ hardwareOverview?.health?.physicalHostNote ?? 'Streaming live runtime metrics from Reactor backend.' }}
+          </p>
           <div class="hardware-grid">
             <article v-for="card in diagnosticCards" :key="card.label">
               <span>{{ card.label }}</span>
