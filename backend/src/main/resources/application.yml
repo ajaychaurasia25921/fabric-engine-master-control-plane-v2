@@ -38,6 +38,8 @@ spring:
 
 fabric:
   openapi-path: ${FABRIC_OPENAPI_PATH:../openapi.yml}
+  cors:
+    allowed-origins: ${FABRIC_CORS_ALLOWED_ORIGINS:http://localhost:*}
   telemetry:
     demo-events-enabled: true
   smpp:
@@ -45,3 +47,13 @@ fabric:
     port: 2775
     system-id: fabric-engine
     password: change-me
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

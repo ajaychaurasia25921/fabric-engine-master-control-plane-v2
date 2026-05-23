@@ -1,0 +1,8 @@
+fabric:
+  telemetry:
+    demo-events-enabled: ${FABRIC_DEMO_EVENTS_ENABLED:false}
+  smpp:
+    host: ${FABRIC_SMPP_HOST}
+    port: ${FABRIC_SMPP_PORT:2775}
+    system-id: ${FABRIC_SMPP_SYSTEM_ID}
+    password: ${FABRIC_SMPP_PASSWORD}

@@ -37,6 +37,24 @@ Services:
 Spring AI auto-pulls `llama3.2:3b` and `nomic-embed-text` when missing. Override with `OLLAMA_CHAT_MODEL` and `OLLAMA_EMBEDDING_MODEL`.
 Database schema is created at backend startup by Flyway migrations in `backend/src/main/resources/db/migration`. Docker Compose uses Postgres with R2DBC for app access and JDBC/Flyway for migrations.
 
+## Public Hosting
+
+This repository includes `render.yaml` for a GitHub-connected Render Blueprint:
+
+- `reactor-backend`: Dockerized Spring WebFlux service with `/actuator/health`.
+- `reactor-frontend`: static Vue build with SPA rewrites.
+
+Before public launch, create managed PostgreSQL credentials and an externally reachable Ollama-compatible model endpoint, then set the variables from `.env.production.example` in Render. Free web services can sleep after inactivity, and they are not a good place to run Postgres plus Ollama inside the same container. Keep the Compose stack for local development; use managed services for public launch.
+
+Recommended release checklist:
+
+- Set `SPRING_PROFILES_ACTIVE=prod`.
+- Set `FABRIC_CORS_ALLOWED_ORIGINS` to the deployed frontend URL.
+- Set all R2DBC and Flyway database values to the same managed PostgreSQL database.
+- Set `OLLAMA_BASE_URL` to your hosted Ollama-compatible endpoint.
+- Set real SMPP credentials for SMS dispatch.
+- Leave `FABRIC_DEMO_EVENTS_ENABLED=false` for production unless you intentionally want simulated telemetry.
+
 ## Backend
 
 ```bash
