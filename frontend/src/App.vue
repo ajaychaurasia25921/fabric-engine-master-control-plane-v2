@@ -27,7 +27,8 @@ const navGroups = [
     label: 'Overview',
     tabs: [
       ['dashboard', 'Main Dashboard'],
-      ['360-view', '360 View']
+      ['360-view', '360 View'],
+      ['approvals', 'Approval Dashboard']
     ]
   },
   {
@@ -66,6 +67,7 @@ const navGroups = [
 const tabCopy = {
   dashboard: ['System Infrastructure Control Room', 'Unified master plane lifecycle validation interface.'],
   '360-view': ['360 View', 'Physical host diagnostics, actuator-style runtime panels, and AI operations guidance.'],
+  approvals: ['Founder Approval Dashboard', 'Review CEO-agent recommendations before Reactor changes infrastructure state.'],
   servers: ['Enterprise Cluster Provisioning Bay', 'Inject dynamic microcode metadata parameters across server resource blueprints.'],
   'local-vms': ['Local VM Workstation', 'Create physical-host VMs through VMware vmrun or QEMU with guarded execution.'],
   'sms-gateway': ['SMS Telecom Gateway Aggregator Hub', 'Realtime critical SMS alerting dispatcher framework and transaction monitor.'],
@@ -107,12 +109,13 @@ const deviceRegistration = ref(null);
 const aiGuideOpen = ref(true);
 const aiGuideInput = ref('How do I provision an AI VM and register it on the fabric?');
 const aiGuideMessages = ref([
-  { role: 'guide', text: 'Namaste, Aarohi here. Main aapki Reactor guide hoon. Aap Hindi, English, ya Hinglish mein bol sakte ho; main dhyaan se sunungi, samjhaungi, aur koi bhi action lene se pehle approval maangungi.' }
+  { role: 'guide', text: 'Namaste, Aarohi here. I operate as Reactor CEO-agent: I set product direction, prioritize risk, and prepare decisions. You are the founder/owner, so I will ask your approval before any action changes the platform.' }
 ]);
 const aiVoiceEnabled = ref(true);
 const aiVoiceGender = ref('female');
 const aiLanguage = ref('auto');
 const aiPendingActions = ref([]);
+const approvalHistory = ref([]);
 const aiListening = ref(false);
 const aiVoiceMode = ref('natural');
 const aiInterimTranscript = ref('');
@@ -612,6 +615,12 @@ function stopVoiceInput() {
 }
 
 function approveAgentAction(action) {
+  approvalHistory.value = [{
+    ...action,
+    decision: 'APPROVED',
+    decidedAt: new Date().toLocaleString(),
+    owner: 'Founder / Owner'
+  }, ...approvalHistory.value].slice(0, 20);
   if (action.commandType === 'OPEN_TAB') {
     activeTab.value = action.payload.target;
   }
@@ -622,12 +631,18 @@ function approveAgentAction(action) {
     serverForm.deploymentFramework = 'VIRTUAL_MACHINE';
   }
   aiPendingActions.value = aiPendingActions.value.filter((item) => item.actionId !== action.actionId);
-  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: action approved and applied: ${action.label}` }];
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: founder approval received. I applied the approved CEO-agent recommendation: ${action.label}` }];
 }
 
 function rejectAgentAction(action) {
+  approvalHistory.value = [{
+    ...action,
+    decision: 'REJECTED',
+    decidedAt: new Date().toLocaleString(),
+    owner: 'Founder / Owner'
+  }, ...approvalHistory.value].slice(0, 20);
   aiPendingActions.value = aiPendingActions.value.filter((item) => item.actionId !== action.actionId);
-  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: understood, I will not perform: ${action.label}` }];
+  aiGuideMessages.value = [...aiGuideMessages.value, { role: 'guide', text: `${aiPersonaName.value}: founder decision noted. I will not perform: ${action.label}` }];
 }
 
 function terminateInstance(id) {
@@ -1039,6 +1054,44 @@ vm-pool: {{ hardwareOverview?.vmPool?.capacityState ?? 'READY' }}</pre></article
 /actuator/metrics/jvm.threads.live
 /api/v1/hardware/overview</pre></article>
           <article class="panel"><h3>AI Suggestions & Alerts</h3><div class="suggestion-list"><p v-for="item in [...(hardwareOverview?.aiSuggestions ?? []), ...(hardwareOverview?.alerts ?? [])]" :key="item">{{ item }}</p></div></article>
+        </section>
+      </section>
+
+      <section v-if="activeTab === 'approvals'" class="tab-page">
+        <section class="panel">
+          <div class="panel-title-row">
+            <div>
+              <h3>Founder / Owner Approval Queue</h3>
+              <p class="muted">The AI guide acts as Reactor CEO-agent, but infrastructure decisions stay gated by your approval.</p>
+            </div>
+            <span class="status-chip amber">{{ aiPendingActions.length }} pending</span>
+          </div>
+          <div class="approval-grid">
+            <article v-for="action in aiPendingActions" :key="action.actionId" class="approval-card">
+              <span class="status-chip">CEO-agent proposal</span>
+              <h4>{{ action.label }}</h4>
+              <p>{{ action.description }}</p>
+              <dl>
+                <dt>Decision Type</dt><dd>{{ action.commandType }}</dd>
+                <dt>Authority</dt><dd>Founder / Owner approval required</dd>
+              </dl>
+              <pre>{{ JSON.stringify(action.payload, null, 2) }}</pre>
+              <div class="button-row">
+                <button class="primary-button" @click="approveAgentAction(action)">Approve</button>
+                <button class="danger-button" @click="rejectAgentAction(action)">Reject</button>
+              </div>
+            </article>
+            <p v-if="!aiPendingActions.length" class="empty-state">No CEO-agent decisions are waiting for approval.</p>
+          </div>
+        </section>
+        <section class="panel">
+          <h3>Decision Audit Trail</h3>
+          <article v-for="item in approvalHistory" :key="`${item.actionId}-${item.decidedAt}`" class="event-row">
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.decision }} by {{ item.owner }} · {{ item.decidedAt }}</span>
+            <small>{{ item.description }}</small>
+          </article>
+          <p v-if="!approvalHistory.length" class="empty-state">Approval history will appear after you approve or reject a CEO-agent proposal.</p>
         </section>
       </section>
 
